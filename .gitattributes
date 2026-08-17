@@ -1,0 +1,8 @@
+# core.autocrlf is commonly true on Windows checkouts of this repo. The capture
+# fixtures in testdata/ must survive byte-for-byte -- a single inserted CR would
+# desynchronise the DVC bit-stream and make every replay meaningless. Git's
+# NUL-byte heuristic already classifies them as binary, but do not rely on a
+# heuristic for test data.
+*.bin binary
+*.png binary
+*.jar binary
