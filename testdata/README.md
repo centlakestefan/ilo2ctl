@@ -77,10 +77,19 @@ distinct colors: 1
 
 - `distinct colors: 481` is expected, not a defect: DVC is RGB444, so every
   channel is a nibble times 0x11 (`#001111`, `#002211`, …), 4096 possible.
-- A full 1024x768 frame is exactly **6144** pastes. That is 2x the 3072 16x16
-  tiles the port currently assumes, and the discrepancy is not yet explained —
-  the image renders correctly, so the geometry cannot be badly wrong, but this
-  is worth re-deriving.
+- **Tile geometry is exactly as the port assumes**, measured across all three
+  fixtures: 3072 distinct positions, a 64x48 grid, every position 16-aligned,
+  `max x` 1008 (63*16), `max y` 752 (47*16), `len` always 16. One full pass over
+  the screen is 3072 pastes.
+- The iLO emits the MODE2 resolution packet every **two** full passes, so the
+  gap between consecutive `set_dimensions` events is 6144 pastes. That interval
+  is a resolution-packet cadence, not a frame size — do not read it as one frame.
+- This encoder is **not** diff-based: each pass retransmits every tile, and most
+  of that is redundant. In `lock_screen_settled.bin`, 27099 of 32256 pastes were
+  byte-identical rewrites of a tile that had not changed (only 2085 differed).
+  A consequence worth knowing: because every tile really is retransmitted, the
+  black regions along the bottom edge and behind the "Activate Windows"
+  watermark are genuine server output, not stale tiles that were never repainted.
 - The streams contain no credentials. Session keys were negotiated per-session
   and the payload is already decrypted; the login handshake is not included.
   They do depict the server's lock screen (wallpaper, clock, hostname-free).
