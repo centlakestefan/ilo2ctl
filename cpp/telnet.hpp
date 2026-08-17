@@ -135,7 +135,9 @@ public:
 
     // telnet.transmit(String): write the low 8 bits of each char as raw bytes.
     // (The base class sends cleartext; cim overrides transmit() to encrypt.)
-    void transmit(const std::string& s) {
+    // Virtual because connect() calls it to send the login token, and in the JAR
+    // that call lands in cim.transmit -- i.e. the login is itself encrypted.
+    virtual void transmit(const std::string& s) {
         if (sock_ == INVALID_SOCK || s.empty()) return;
         send_all(reinterpret_cast<const uint8_t*>(s.data()), s.size());
     }

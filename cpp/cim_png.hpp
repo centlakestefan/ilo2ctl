@@ -50,7 +50,15 @@ public:
 
 protected:
     // DVC MODE2 resolution -> (re)allocate the framebuffer.
+    //
+    // CRITICAL: a same-size call must be a complete no-op. dvcwin.set_abs_dimensions
+    // (dvcwin.java:112) wraps its whole body in `if (n != screen_x || n2 != screen_y)`,
+    // and real streams repeat the MODE2 resolution packet many times per session.
+    // Without this guard every repeat reallocates and zeroes the buffer, blanking
+    // the image -- a real 346KB capture decoded 4548 tiles containing pixels and
+    // still rendered pure black, because a redundant 1024x768 packet arrived last.
     void on_set_dimensions(int w, int h) override {
+        if (w == fb_w && h == fb_h) return;
         fb_w = w; fb_h = h;
         pixels.assign(static_cast<size_t>(w) * h, 0u);
     }
