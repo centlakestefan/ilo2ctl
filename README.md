@@ -20,7 +20,12 @@ bytecode** via small Java oracles (reflection / recording subclasses).
 | `crypto/bigint.hpp` | fixed-width bignum; `m^e mod n` for public `e` | Python `pow(m, e, n)` |
 | `crypto/rsa.hpp` | RSA PKCS#1 v1.5 type-2 encryption | structural + composition tests |
 | `crypto/random.hpp` | CSPRNG (`BCryptGenRandom` / `getrandom`) | distribution smoke test |
-| `tls/` | hand-written TLS 1.0 client (in progress) | — |
+| `tls/der.hpp` | X.509 -> RSA public key (no verification) | the real iLO certificate |
+| `tls/prf.hpp` | TLS 1.0 PRF + master/key-block/Finished | OpenSSL `TLS1-PRF` (MD5-SHA1) |
+| `tls/record.hpp` | record layer, RC4 + HMAC, continuous keystream | independent Python model |
+| `tls/handshake.hpp` | messages, transcript, Finished | simulated handshake |
+| `tls/client.hpp` | handshake state machine + `https_get` | scripted mock server |
+| `tls/socket.hpp` | blocking TCP client, Windows + POSIX | — |
 | `ilo/telnet.hpp` | transport: socket, login, DVC trigger, decrypt | real `telnet.run()` |
 | `ilo/dvc_bits.hpp` | DVC bit reader (reversal tables, get/add_bits) | real `cim` reflection |
 | `ilo/dvc_cache.hpp` | RGB444 remap + LRU palette cache | real `cim` reflection |

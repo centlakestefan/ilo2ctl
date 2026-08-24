@@ -42,6 +42,7 @@ set(SELF_ASSERTING_TESTS
     test_prf
     test_record
     test_handshake
+    test_client
     test_random
     test_crypto
 )
