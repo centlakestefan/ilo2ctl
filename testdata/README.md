@@ -93,3 +93,31 @@ distinct colors: 1
 - The streams contain no credentials. Session keys were negotiated per-session
   and the payload is already decrypted; the login handshake is not included.
   They do depict the server's lock screen (wallpaper, clock, hostname-free).
+
+## `ilo_cert.der` (612 bytes)
+
+The X.509 certificate the iLO 2 serves on port 443, captured with a raw
+ClientHello probe. It is the fixture for `tls/der.hpp` and is regenerated into
+`tests/cert_fixture.inc` by `tests/gen_cert_fixture.py`.
+
+```
+subject/issuer : C=US, ST=Texas, L=Houston, O=Hewlett-Packard Company,
+                 OU=ISS, CN=ILOUSE951N96F   (self-signed)
+key            : RSA 1024-bit, e=65537
+signature      : md5WithRSAEncryption
+validity       : 2002-12-05 .. 2022-12-05   (EXPIRED)
+```
+
+Two properties make it a better test input than a modern certificate:
+
+- the modulus has its top bit set, so DER encodes it as **129** bytes with a
+  leading `0x00` sign pad while the key size is **128** — conflating the two is
+  the classic way to get RSA key handling wrong;
+- it is a **v1** certificate, so `tbsCertificate` has no `[0] EXPLICIT` version
+  field and every subsequent field sits one slot earlier than in a v3 cert. A
+  parser that reaches SubjectPublicKeyInfo by counting children from a fixed
+  offset lands in the wrong place, which is why `tls/der.hpp` matches on shape
+  instead.
+
+This is public key material — the device presents it to any client that opens a
+TLS connection — and it contains no session or credential data.

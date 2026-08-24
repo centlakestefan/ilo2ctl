@@ -5,4 +5,5 @@
 # heuristic for test data.
 *.bin binary
 *.png binary
+*.der binary
 *.jar binary

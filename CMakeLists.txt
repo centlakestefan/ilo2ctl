@@ -38,6 +38,7 @@ set(SELF_ASSERTING_TESTS
     test_hmac
     test_bigint
     test_rsa
+    test_der
     test_random
     test_crypto
 )
