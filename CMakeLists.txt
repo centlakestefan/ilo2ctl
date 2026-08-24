@@ -10,8 +10,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(ilo2_core INTERFACE)
 target_include_directories(ilo2_core INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 if(WIN32)
-    # ws2_32: sockets (ilo/telnet.hpp).
-    target_link_libraries(ilo2_core INTERFACE ws2_32)
+    # ws2_32: sockets (ilo/telnet.hpp).  bcrypt: BCryptGenRandom (crypto/random.hpp).
+    target_link_libraries(ilo2_core INTERFACE ws2_32 bcrypt)
 endif()
 
 if(MSVC)
@@ -34,6 +34,11 @@ endif()
 enable_testing()
 
 set(SELF_ASSERTING_TESTS
+    test_sha1
+    test_hmac
+    test_bigint
+    test_rsa
+    test_random
     test_crypto
 )
 set(ORACLE_DIFF_TESTS

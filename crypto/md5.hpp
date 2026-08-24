@@ -16,6 +16,11 @@ namespace ilo2 {
 
 class MD5 {
 public:
+    // Mirrors SHA1's surface so hmac.hpp / the TLS 1.0 PRF can template over both.
+    static constexpr size_t DIGEST_SIZE = 16;
+    static constexpr size_t BLOCK_SIZE  = 64;
+    using Digest = std::array<uint8_t, DIGEST_SIZE>;
+
     MD5() { init(); }
 
     void init() {
