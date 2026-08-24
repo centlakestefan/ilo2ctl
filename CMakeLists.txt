@@ -40,6 +40,7 @@ set(SELF_ASSERTING_TESTS
     test_rsa
     test_der
     test_prf
+    test_record
     test_random
     test_crypto
 )
