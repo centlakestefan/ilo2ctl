@@ -44,6 +44,12 @@ struct Options {
     // dummy video driver, without a window existing at all.
     std::string screenshot;
     int         frames_before_shot = 150;
+    // Send arrow keys and Escape once, shortly after connecting, to wake a
+    // blanked console. Deliberately only keys that move nothing and commit
+    // nothing: mouse motion does not wake a blanked Windows login screen, and
+    // anything that types a character would be a change to the server rather
+    // than a nudge.
+    bool        wake = false;
 };
 
 // Where the console image lands inside the window, preserving aspect ratio.
@@ -109,6 +115,7 @@ void parse_args(int argc, char** argv, Options& o) {
         else if (a == "--refresh-every") o.refresh_every = std::atoi(next().c_str());
         else if (a == "--screenshot")    o.screenshot = next();
         else if (a == "--frames")        o.frames_before_shot = std::atoi(next().c_str());
+        else if (a == "--wake")          o.wake = true;
     }
 }
 
@@ -191,6 +198,8 @@ int main(int argc, char** argv) {
     bool send_input = true;
     unsigned long long uploads = 0, frames = 0;
     int rendered = 0;
+    int connected_frames = 0;
+    bool wake_sent = false;
 
     auto do_connect = [&] {
         ui_error.clear();
@@ -260,6 +269,19 @@ int main(int argc, char** argv) {
                     break;
                 }
                 default: break;
+            }
+        }
+
+        // A blanked console shows nothing until something wakes it. This goes
+        // through exactly the same queue the toolbar and keyboard use, so it
+        // exercises the outbound path rather than bypassing it.
+        if (opt.wake && !wake_sent && core.state() == ConsoleState::Connected) {
+            if (++connected_frames > 120) {          // ~2s after DVC mode starts
+                core.send_raw(Input::arrow_right());
+                core.send_raw(Input::arrow_left());
+                core.send_raw(Input::escape());
+                core.request_refresh();
+                wake_sent = true;
             }
         }
 
