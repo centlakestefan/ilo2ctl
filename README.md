@@ -26,6 +26,8 @@ bytecode** via small Java oracles (reflection / recording subclasses).
 | `tls/handshake.hpp` | messages, transcript, Finished | simulated handshake |
 | `tls/client.hpp` | handshake state machine + `https_get` | scripted mock server |
 | `tls/socket.hpp` | blocking TCP client, Windows + POSIX | — |
+| `ilo/ilo_session.hpp` | iLO login + drc2fram.htm parameter scrape | live iLO 2 |
+| `tools/tls_get.cpp` | HTTPS fetch (replaces `curl --tlsv1.0`) | byte-identical to curl |
 | `ilo/telnet.hpp` | transport: socket, login, DVC trigger, decrypt | real `telnet.run()` |
 | `ilo/dvc_bits.hpp` | DVC bit reader (reversal tables, get/add_bits) | real `cim` reflection |
 | `ilo/dvc_cache.hpp` | RGB444 remap + LRU palette cache | real `cim` reflection |
@@ -36,7 +38,8 @@ bytecode** via small Java oracles (reflection / recording subclasses).
 | `tools/capture_dvc.cpp` | live capture -> `.bin` + PNG | — |
 | `tools/replay_dvc.cpp` | offline replay + decoder stats | `testdata/` fixtures |
 | `tests/*Probe.java`, `tests/test_*.cpp` | validation oracles + tests | — |
-| `launch_console.py` | original: iLO login + applet launcher (TLS 1.0 via curl) | — |
+| `capture_console.py` | thin shim; `capture_dvc` now logs in itself | — |
+| `launch_console.py` | original: applet launcher (still uses curl) | — |
 | `mount_and_boot.py` | original: virtual-media mount + boot via `hpilo` | — |
 | `range_http_server.py` | HTTP server with Range support for virtual media | — |
 

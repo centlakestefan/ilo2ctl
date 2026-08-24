@@ -511,8 +511,41 @@ inline bool https_get(const std::string& host, uint16_t port, const std::string&
 
     if (!c.send(req, err)) { c.close(); return false; }
 
+    // Read until the RESPONSE is complete, not until the peer closes.
+    //
+    // The iLO sends "Connection: close" and then does not close, so waiting for
+    // EOF simply stalls until the socket times out. A correct HTTP client stops
+    // when the body is complete anyway: at the terminating chunk when the
+    // response is chunked, or after Content-Length bytes when it is not. Only a
+    // response that gives neither is read to EOF.
     std::string raw;
+    size_t header_end = std::string::npos;
+    bool   chunked = false;
+    size_t content_length = SIZE_MAX;
+
     for (;;) {
+        if (header_end == std::string::npos) {
+            header_end = raw.find("\r\n\r\n");
+            if (header_end != std::string::npos) {
+                const std::string h = raw.substr(0, header_end);
+                chunked = header_value(h, "Transfer-Encoding").find("chunked") != std::string::npos;
+                const std::string cl = header_value(h, "Content-Length");
+                if (!cl.empty())
+                    content_length = static_cast<size_t>(std::strtoul(cl.c_str(), nullptr, 10));
+            }
+        }
+        if (header_end != std::string::npos) {
+            const std::string body = raw.substr(header_end + 4);
+            if (chunked) {
+                // dechunk succeeds only once the terminating chunk has arrived,
+                // which makes it the completeness test as well as the decoder.
+                std::string probe;
+                if (dechunk(body, probe)) break;
+            } else if (content_length != SIZE_MAX) {
+                if (body.size() >= content_length) break;
+            }
+        }
+
         std::vector<uint8_t> chunk;
         bool eof = false;
         std::string rerr;

@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "ilo/ilo2_session.hpp"
+#include "ilo/ilo_session.hpp"
 #include "ilo/ilo2_input.hpp"
 #include "ilo/cim_png.hpp"
 
@@ -147,24 +148,54 @@ protected:
     }
 };
 
+// The password, in the same order capture_console.py looked for it: the
+// ILO_PASS environment variable, else a gitignored .ilo_pass beside the binary.
+static std::string read_password(const std::string& explicit_pass,
+                                 const std::string& pass_file) {
+    if (!explicit_pass.empty()) return explicit_pass;
+    if (const char* env = std::getenv("ILO_PASS")) {
+        std::string p(env);
+        while (!p.empty() && (p.back() == '\n' || p.back() == '\r' || p.back() == ' ')) p.pop_back();
+        if (!p.empty()) return p;
+    }
+    std::FILE* f = std::fopen(pass_file.c_str(), "rb");
+    if (!f) return std::string();
+    char buf[256];
+    const size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
+    std::fclose(f);
+    buf[n] = '\0';
+    std::string p(buf);
+    while (!p.empty() && (p.back() == '\n' || p.back() == '\r' || p.back() == ' ')) p.pop_back();
+    return p;
+}
+
 int main(int argc, char** argv) {
     std::string host, info0, infob_hex, infoc_hex, out_bin = "build/dvc_capture.bin";
     std::string png_prefix = "build/frame";
+    std::string user = "Administrator", pass, pass_file = ".ilo_pass";
     int port = 23, seconds = 20, infod = 0, refresh_every = 0;
+    int https_port = 443;
     bool info1 = false, encrypted = true, wake = false, wake_keys = false;
+    bool have_info1 = false, have_infoa = false;
+    bool params_only = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> std::string { return (i + 1 < argc) ? argv[++i] : std::string(); };
         if      (a == "--host")    host = next();
+        else if (a == "--user")    user = next();
+        else if (a == "--pass")    pass = next();
+        else if (a == "--pass-file") pass_file = next();
+        else if (a == "--https-port") https_port = std::atoi(next().c_str());
         else if (a == "--port")    port = std::atoi(next().c_str());
         else if (a == "--info0")   info0 = next();
-        else if (a == "--info1")   info1 = (next() == "1");
-        else if (a == "--infoa")   encrypted = (next() == "1");
+        else if (a == "--info1") { info1 = (next() == "1"); have_info1 = true; }
+        else if (a == "--infoa") { encrypted = (next() == "1"); have_infoa = true; }
         else if (a == "--infob")   infob_hex = next();
         else if (a == "--infoc")   infoc_hex = next();
         else if (a == "--infod")   infod = std::atoi(next().c_str());
         else if (a == "--seconds") seconds = std::atoi(next().c_str());
+        else if (a == "--params-only") params_only = true;
         else if (a == "--wake")      wake = true;
         else if (a == "--wake-keys") wake_keys = true;
         else if (a == "--refresh-every") refresh_every = std::atoi(next().c_str());
@@ -172,12 +203,68 @@ int main(int argc, char** argv) {
         else if (a == "--png")     png_prefix = next();
         else { std::fprintf(stderr, "unknown arg: %s\n", a.c_str()); return 2; }
     }
-    if (host.empty() || info0.empty()) {
+    if (host.empty()) {
         std::fprintf(stderr,
-            "usage: capture_dvc --host H --info0 <b64> [--info1 1] [--infoa 1]\n"
-            "                   [--infob <32hex>] [--infoc <32hex>] [--infod N]\n"
-            "                   [--port 23] [--seconds 20] [--out f.bin] [--png pfx]\n");
+            "usage: capture_dvc --host H [--user U] [--pass P | --pass-file F]\n"
+            "                   [--seconds 20] [--out f.bin] [--png pfx]\n"
+            "                   [--wake] [--wake-keys] [--refresh-every SEC]\n"
+            "                   [--params-only]   log in, print params, stop\n"
+            "\n"
+            "  Logs in over HTTPS and scrapes the console parameters itself.\n"
+            "  The password comes from --pass, else $ILO_PASS, else .ilo_pass.\n"
+            "\n"
+            "  To bypass the login and supply parameters directly:\n"
+            "    --info0 <b64> [--info1 1] [--infoa 1] [--infob <32hex>]\n"
+            "    [--infoc <32hex>] [--infod N] [--port 23]\n");
         return 2;
+    }
+
+    // No INFO0 given: acquire a session ourselves, which is what
+    // capture_console.py used to do by shelling out to curl.
+    if (info0.empty()) {
+        const std::string pw = read_password(pass, pass_file);
+        if (pw.empty()) {
+            std::fprintf(stderr,
+                "no iLO password: pass --pass, set ILO_PASS, or put it in %s\n",
+                pass_file.c_str());
+            return 2;
+        }
+        std::printf("[*] logging in to %s as %s ...\n", host.c_str(), user.c_str());
+        ConsoleParams cp;
+        std::string err;
+        if (!acquire_console_session(host, static_cast<uint16_t>(https_port),
+                                     user, pw, cp, err)) {
+            std::fprintf(stderr, "[!] %s\n", err.c_str());
+            return 1;
+        }
+        std::printf("[+] session %s, %zu console parameters\n",
+                    cp.session_index.c_str(), cp.info.size());
+
+        info0 = cp.get("info0");
+        // INFO1 is a PRESENCE flag: its value is ignored, only whether the
+        // parameter appears at all (remcons.init_params, remcons.java:310).
+        if (!have_info1) info1 = cp.has("info1");
+        if (!have_infoa) encrypted = (cp.get("infoa", "1") == "1");
+        if (infob_hex.empty()) infob_hex = cp.get("infob");
+        if (infoc_hex.empty()) infoc_hex = cp.get("infoc");
+        if (infod == 0)        infod = std::atoi(cp.get("infod", "0").c_str());
+        if (port == 23)        port = std::atoi(cp.get("info6", "23").c_str());
+
+        for (const auto& kv : cp.info) {
+            const bool secret = (kv.first == "infob" || kv.first == "infoc");
+            const std::string shown = secret
+                ? kv.second.substr(0, 8) + "... (" + std::to_string(kv.second.size()) + " hex)"
+                : kv.second;
+            std::printf("    %-8s = %s\n", kv.first.c_str(), shown.c_str());
+        }
+
+        if (params_only) {
+            // Stop before touching port 23. The iLO allows exactly one remote
+            // console session, so this is the way to exercise the login and the
+            // scrape without taking that slot.
+            std::printf("[+] --params-only: not opening a console session\n");
+            return 0;
+        }
     }
 
     // remcons.init_params(): login = ESC[7 ESC[9 [ESC[4] <decoded INFO0>
