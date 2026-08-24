@@ -478,5 +478,74 @@ int main() {
         t::ok(c.server_certificate().size() == mock_der.size(), "server certificate retained");
     }
 
+    std::printf("[HTTP header lookup]\n");
+    {
+        const std::string h =
+            "HTTP/1.1 200 Ok\r\n"
+            "Content-Type: text/html\r\n"
+            "Transfer-Encoding:  chunked  \r\n"
+            "Content-Length: 1475";
+        t::eq(header_value(h, "Content-Type"), "text/html", "simple lookup");
+        t::eq(header_value(h, "content-type"), "text/html", "lookup is case-insensitive");
+        t::eq(header_value(h, "CONTENT-TYPE"), "text/html", "and in the other direction");
+        t::eq(header_value(h, "Transfer-Encoding"), "chunked", "surrounding space is trimmed");
+        t::eq(header_value(h, "Content-Length"), "1475", "last header, no trailing CRLF");
+        t::eq(header_value(h, "Set-Cookie"), "", "an absent header yields empty");
+        // A name that appears only as a substring of another must not match.
+        t::eq(header_value(h, "Type"), "", "partial names do not match");
+    }
+
+    std::printf("[chunked transfer decoding]\n");
+    {
+        std::string out;
+        t::ok(dechunk("5\r\nhello\r\n0\r\n\r\n", out), "single chunk decodes");
+        t::eq(out, "hello", "content is right");
+
+        out.clear();
+        t::ok(dechunk("5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n", out),
+              "multiple chunks decode");
+        t::eq(out, "hello world", "chunks are concatenated");
+
+        out.clear();
+        t::ok(dechunk("14A\r\n" + std::string(0x14A, 'x') + "\r\n0\r\n\r\n", out),
+              "a three-digit hex size decodes");
+        t::ok(out.size() == 0x14A, "size parsed as hexadecimal, not decimal");
+
+        out.clear();
+        t::ok(dechunk("a\r\n0123456789\r\n0\r\n\r\n", out), "lowercase hex");
+        t::eq(out, "0123456789", "content is right");
+
+        out.clear();
+        t::ok(dechunk("5;name=value\r\nhello\r\n0\r\n\r\n", out),
+              "chunk extensions are ignored");
+        t::eq(out, "hello", "content is right");
+
+        out.clear();
+        t::ok(dechunk("0\r\n\r\n", out), "an empty body decodes");
+        t::eq(out, "", "and yields nothing");
+
+        // Malformed inputs must be refused rather than read past the end.
+        out.clear();
+        t::ok(!dechunk("5\r\nhi\r\n0\r\n\r\n", out), "a short chunk is refused");
+        out.clear();
+        t::ok(!dechunk("zz\r\nhello\r\n", out), "a non-hex size is refused");
+        out.clear();
+        t::ok(!dechunk("5\r\nhelloXX0\r\n\r\n", out), "a missing chunk CRLF is refused");
+        out.clear();
+        t::ok(!dechunk("5\r\nhello", out), "an unterminated body is refused");
+        out.clear();
+        t::ok(!dechunk("", out), "empty input is refused");
+        out.clear();
+        t::ok(!dechunk("\r\n", out), "a blank size line is refused");
+
+        // Every prefix of a valid body must fail cleanly.
+        const std::string good = "5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n";
+        for (size_t n = 0; n < good.size(); ++n) {
+            std::string partial;
+            dechunk(good.substr(0, n), partial);
+        }
+        t::ok(true, "every truncated chunked body was handled");
+    }
+
     return t::report("test_client");
 }

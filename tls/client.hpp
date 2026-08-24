@@ -429,15 +429,80 @@ struct HttpResponse {
     std::string body;
 };
 
-// A deliberately small HTTP/1.0 GET: request, then read until the peer closes.
-// The iLO's pages are small and it closes after each response, which is exactly
-// what curl --tlsv1.0 was doing for the Python scripts this replaces.
+// Case-insensitive header lookup; returns the value with surrounding space
+// trimmed, or "" when the header is absent.
+inline std::string header_value(const std::string& headers, const std::string& name) {
+    auto lower = [](std::string v) {
+        for (char& ch : v) if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+        return v;
+    };
+    const std::string hay = lower(headers), needle = lower(name) + ":";
+    size_t pos = 0;
+    while (pos < hay.size()) {
+        const size_t eol = hay.find("\r\n", pos);
+        const size_t end = (eol == std::string::npos) ? hay.size() : eol;
+        if (hay.compare(pos, needle.size(), needle) == 0) {
+            size_t vs = pos + needle.size();
+            while (vs < end && (headers[vs] == ' ' || headers[vs] == '\t')) ++vs;
+            size_t ve = end;
+            while (ve > vs && (headers[ve - 1] == ' ' || headers[ve - 1] == '\t')) --ve;
+            return headers.substr(vs, ve - vs);
+        }
+        if (eol == std::string::npos) break;
+        pos = eol + 2;
+    }
+    return std::string();
+}
+
+// Decode HTTP chunked transfer coding. The iLO uses it for every page, since it
+// only serves HTTP/1.1 (see below), so this is not optional.
+inline bool dechunk(const std::string& in, std::string& out) {
+    size_t pos = 0;
+    for (;;) {
+        const size_t eol = in.find("\r\n", pos);
+        if (eol == std::string::npos) return false;
+        std::string line = in.substr(pos, eol - pos);
+        const size_t semi = line.find(';');           // chunk extensions
+        if (semi != std::string::npos) line.resize(semi);
+
+        size_t size = 0;
+        bool any = false;
+        for (char ch : line) {
+            int v;
+            if (ch >= '0' && ch <= '9')      v = ch - '0';
+            else if (ch >= 'a' && ch <= 'f') v = ch - 'a' + 10;
+            else if (ch >= 'A' && ch <= 'F') v = ch - 'A' + 10;
+            else if (ch == ' ' || ch == '\t') continue;
+            else return false;
+            size = size * 16 + static_cast<size_t>(v);
+            any = true;
+        }
+        if (!any) return false;
+
+        pos = eol + 2;
+        if (size == 0) return true;                   // terminating chunk
+        if (pos + size > in.size()) return false;
+        out.append(in, pos, size);
+        pos += size;
+        if (in.compare(pos, 2, "\r\n") != 0) return false;
+        pos += 2;
+    }
+}
+
+// An HTTPS GET, replacing the `curl -k --tlsv1.0` the Python scrapers shell out
+// to. Two things this device forces, both learned from it directly:
+//
+//   * HTTP/1.1 is mandatory. An HTTP/1.0 request is answered 200 OK with a page
+//     reading "Your browser must support HTTP 1.1 to view iLO web pages" -- so
+//     the failure is not an error code, it is a valid-looking wrong page, which
+//     is exactly the sort of thing a scraper silently mistakes for content.
+//   * Every response is then chunked, so the body must be de-chunked.
 inline bool https_get(const std::string& host, uint16_t port, const std::string& path,
                       const std::string& cookie, HttpResponse& out, std::string& err) {
     Client c;
     if (!c.connect(host, port, err)) return false;
 
-    std::string req = "GET " + path + " HTTP/1.0\r\n"
+    std::string req = "GET " + path + " HTTP/1.1\r\n"
                       "Host: " + host + "\r\n"
                       "User-Agent: ilo2-console/1.0\r\n"
                       "Accept: */*\r\n";
@@ -474,6 +539,22 @@ inline bool https_get(const std::string& host, uint16_t port, const std::string&
     if (raw.compare(0, 5, "HTTP/") == 0) {
         const size_t sp = out.headers.find(' ');
         if (sp != std::string::npos) out.status = std::atoi(out.headers.c_str() + sp + 1);
+    }
+
+    const std::string te = header_value(out.headers, "Transfer-Encoding");
+    if (te.find("chunked") != std::string::npos) {
+        std::string decoded;
+        if (!dechunk(out.body, decoded)) {
+            err = "malformed chunked response body";
+            return false;
+        }
+        out.body.swap(decoded);
+    } else {
+        const std::string cl = header_value(out.headers, "Content-Length");
+        if (!cl.empty()) {
+            const size_t want = static_cast<size_t>(std::strtoul(cl.c_str(), nullptr, 10));
+            if (out.body.size() > want) out.body.resize(want);
+        }
     }
     return true;
 }

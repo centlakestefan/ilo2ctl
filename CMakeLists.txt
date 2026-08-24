@@ -72,3 +72,6 @@ target_link_libraries(replay_dvc PRIVATE ilo2_core)
 
 add_executable(capture_dvc tools/capture_dvc.cpp)
 target_link_libraries(capture_dvc PRIVATE ilo2_core)
+
+add_executable(tls_get tools/tls_get.cpp)
+target_link_libraries(tls_get PRIVATE ilo2_core)
