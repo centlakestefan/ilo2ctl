@@ -147,6 +147,37 @@ inline void scrape_info_params(const std::string& page,
     }
 }
 
+// The iLO password, in the order the tools look for it: an explicit value, then
+// $ILO_PASS, then a gitignored file (default .ilo_pass).
+//
+// Trailing whitespace is stripped, and that is not fussiness. A .ilo_pass
+// written by hand can easily end "secret \r\n"; a reader that strips only the
+// line ending sends the trailing space as part of the password, the iLO rejects
+// the login, and drc2fram.htm still returns 200 with a page that simply has no
+// info0 in it. The symptom is "the console is in use", several layers away from
+// the cause. One shared implementation so two callers cannot disagree about it.
+inline std::string read_ilo_password(const std::string& explicit_pass,
+                                     const std::string& path = ".ilo_pass") {
+    auto trim = [](std::string v) {
+        while (!v.empty() && (v.back() == '\n' || v.back() == '\r' ||
+                              v.back() == ' '  || v.back() == '\t'))
+            v.pop_back();
+        return v;
+    };
+    if (!explicit_pass.empty()) return trim(explicit_pass);
+    if (const char* env = std::getenv("ILO_PASS")) {
+        const std::string p = trim(env);
+        if (!p.empty()) return p;
+    }
+    std::FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return std::string();
+    char buf[512];
+    const size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
+    std::fclose(f);
+    buf[n] = '\0';
+    return trim(std::string(buf));
+}
+
 // Log in and assemble the session cookie.
 //
 // login.htm carries `var sessionkey="..."` and `var sessionindex="..."`. The

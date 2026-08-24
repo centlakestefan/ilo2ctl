@@ -7,8 +7,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Every local include is written root-relative ("crypto/md5.hpp", "ilo/telnet.hpp"),
 # so the source root is the one include directory anyone needs.
+find_package(Threads REQUIRED)
+
 add_library(ilo2_core INTERFACE)
 target_include_directories(ilo2_core INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ilo2_core INTERFACE Threads::Threads)
 if(WIN32)
     # ws2_32: sockets (ilo/telnet.hpp).  bcrypt: BCryptGenRandom (crypto/random.hpp).
     target_link_libraries(ilo2_core INTERFACE ws2_32 bcrypt)
@@ -44,6 +47,7 @@ set(SELF_ASSERTING_TESTS
     test_handshake
     test_client
     test_ilo_session
+    test_console_core
     test_random
     test_crypto
 )
@@ -76,3 +80,6 @@ target_link_libraries(capture_dvc PRIVATE ilo2_core)
 
 add_executable(tls_get tools/tls_get.cpp)
 target_link_libraries(tls_get PRIVATE ilo2_core)
+
+add_executable(console_probe tools/console_probe.cpp)
+target_link_libraries(console_probe PRIVATE ilo2_core)

@@ -28,6 +28,8 @@ bytecode** via small Java oracles (reflection / recording subclasses).
 | `tls/socket.hpp` | blocking TCP client, Windows + POSIX | — |
 | `ilo/ilo_session.hpp` | iLO login + drc2fram.htm parameter scrape | live iLO 2 |
 | `tools/tls_get.cpp` | HTTPS fetch (replaces `curl --tlsv1.0`) | byte-identical to curl |
+| `ui/console_core.hpp` | front-end seam: framebuffer, dirty rects, input | replay fixtures + live |
+| `tools/console_probe.cpp` | drives the seam like a front end would | live iLO 2 |
 | `ilo/telnet.hpp` | transport: socket, login, DVC trigger, decrypt | real `telnet.run()` |
 | `ilo/dvc_bits.hpp` | DVC bit reader (reversal tables, get/add_bits) | real `cim` reflection |
 | `ilo/dvc_cache.hpp` | RGB444 remap + LRU palette cache | real `cim` reflection |

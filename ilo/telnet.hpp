@@ -155,6 +155,12 @@ public:
         uint8_t buf[1024];
         running_ = true;
         while (running_ && connected_) {
+            // Once per iteration, before blocking for up to a second. A caller
+            // that queues outbound data from another thread (ui/console_core.hpp
+            // does, because the outbound RC4 state cannot be shared) uses this
+            // to flush it from THIS thread. The base implementation does
+            // nothing, so the transport behaves exactly as before.
+            on_idle();
             int n = recv_bytes(sock_, buf, sizeof(buf));
             if (n == RECV_TIMEOUT) continue;      // InterruptedIOException -> continue
             if (n <= 0) break;                    // <0 or EOF -> leave loop
@@ -177,6 +183,10 @@ protected:
 
     // UI status hook. Base is a no-op (the transport core has no UI).
     virtual void set_status(int /*field*/, const std::string& /*text*/) {}
+
+    // Called once per receive-loop iteration, on the receive thread. Base is a
+    // no-op; see the note in run().
+    virtual void on_idle() {}
 
     // Exact per-byte state machine from telnet.run()'s inner loop. Public-ish
     // (protected) so tests can drive it without a socket.

@@ -148,27 +148,6 @@ protected:
     }
 };
 
-// The password, in the same order capture_console.py looked for it: the
-// ILO_PASS environment variable, else a gitignored .ilo_pass beside the binary.
-static std::string read_password(const std::string& explicit_pass,
-                                 const std::string& pass_file) {
-    if (!explicit_pass.empty()) return explicit_pass;
-    if (const char* env = std::getenv("ILO_PASS")) {
-        std::string p(env);
-        while (!p.empty() && (p.back() == '\n' || p.back() == '\r' || p.back() == ' ')) p.pop_back();
-        if (!p.empty()) return p;
-    }
-    std::FILE* f = std::fopen(pass_file.c_str(), "rb");
-    if (!f) return std::string();
-    char buf[256];
-    const size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
-    std::fclose(f);
-    buf[n] = '\0';
-    std::string p(buf);
-    while (!p.empty() && (p.back() == '\n' || p.back() == '\r' || p.back() == ' ')) p.pop_back();
-    return p;
-}
-
 int main(int argc, char** argv) {
     std::string host, info0, infob_hex, infoc_hex, out_bin = "build/dvc_capture.bin";
     std::string png_prefix = "build/frame";
@@ -222,7 +201,7 @@ int main(int argc, char** argv) {
     // No INFO0 given: acquire a session ourselves, which is what
     // capture_console.py used to do by shelling out to curl.
     if (info0.empty()) {
-        const std::string pw = read_password(pass, pass_file);
+        const std::string pw = read_ilo_password(pass, pass_file);
         if (pw.empty()) {
             std::fprintf(stderr,
                 "no iLO password: pass --pass, set ILO_PASS, or put it in %s\n",
