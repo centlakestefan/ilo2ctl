@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Scrape a remote-console session from iLO 2 and hand it to build/capture_dvc.exe,
+Scrape a remote-console session from iLO 2 and hand it to build/cmake/capture_dvc.exe,
 which connects on port 23 and records the decrypted DVC video stream.
 
 This is the hardware-dependent half of the frame-level oracle: the C++ decoder
@@ -24,7 +24,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ILO_HOST = os.environ.get("ILO_HOST", "10.10.123.130")
 ILO_USER = os.environ.get("ILO_USER", "Administrator")
-CAPTURE = os.path.join(HERE, "build", "capture_dvc.exe")
+CAPTURE = os.path.join(HERE, "build", "cmake", "capture_dvc.exe")
 
 
 def _password():
@@ -73,8 +73,8 @@ def main():
                  "next to this script (gitignored).")
     if not os.path.exists(CAPTURE):
         sys.exit(f"Missing {CAPTURE}\n"
-                 f"Build it: g++ -O2 -std=c++17 -o build/capture_dvc.exe "
-                 f"cpp/capture_dvc.cpp -lws2_32")
+                 f"Build it: cmake -S . -B build/cmake -G Ninja && "
+                 f"cmake --build build/cmake --target capture_dvc")
 
     print(f"[*] logging in to {args.host} ...")
     login_page = fetch_page(f"https://{args.host}/login.htm")

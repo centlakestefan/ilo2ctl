@@ -6,7 +6,7 @@
 //     decode->blit->encode pipeline runs and emits a valid PNG).
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "third_party/stb_image_write.h"
-#include "cim_png.hpp"
+#include "ilo/cim_png.hpp"
 #include <cstdio>
 #include <vector>
 

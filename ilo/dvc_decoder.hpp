@@ -15,8 +15,8 @@
 #pragma once
 #include <cstdint>
 #include <string>
-#include "dvc_bits.hpp"
-#include "dvc_cache.hpp"
+#include "ilo/dvc_bits.hpp"
+#include "ilo/dvc_cache.hpp"
 
 namespace ilo2 {
 

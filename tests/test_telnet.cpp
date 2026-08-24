@@ -9,8 +9,8 @@
 #include <cstring>
 #include <string>
 #include <vector>
-#include "telnet.hpp"
-#include "rc4.hpp"
+#include "ilo/telnet.hpp"
+#include "crypto/rc4.hpp"
 
 using namespace ilo2;
 

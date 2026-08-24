@@ -15,7 +15,7 @@
 // capture_console.py scrapes them and invokes this binary.
 //
 // Build:
-//   g++ -O2 -std=c++17 -o build/capture_dvc.exe cpp/capture_dvc.cpp -lws2_32
+//   cmake -S . -B build/cmake -G Ninja && cmake --build build/cmake --target capture_dvc
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "third_party/stb_image_write.h"
 
@@ -28,9 +28,9 @@
 #include <thread>
 #include <vector>
 
-#include "ilo2_session.hpp"
-#include "ilo2_input.hpp"
-#include "cim_png.hpp"
+#include "ilo/ilo2_session.hpp"
+#include "ilo/ilo2_input.hpp"
+#include "ilo/cim_png.hpp"
 
 using namespace ilo2;
 

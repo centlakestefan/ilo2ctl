@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <string>
-#include "dvc_decoder.hpp"
+#include "ilo/dvc_decoder.hpp"
 
 using namespace ilo2;
 

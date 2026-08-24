@@ -2,7 +2,7 @@
 // be diffed against HP's cim output (Ilo2InputProbe.java).
 #include <cstdio>
 #include <string>
-#include "ilo2_input.hpp"
+#include "ilo/ilo2_input.hpp"
 
 using namespace ilo2;
 

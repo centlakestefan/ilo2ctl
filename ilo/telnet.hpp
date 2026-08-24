@@ -25,12 +25,14 @@
 #include <memory>
 #include <atomic>
 #include <thread>
-#include "rc4.hpp"
+#include "crypto/rc4.hpp"
 
 #if defined(_WIN32)
   #include <winsock2.h>
   #include <ws2tcpip.h>
-  #pragma comment(lib, "ws2_32.lib")
+  #if defined(_MSC_VER)                 // CMake links ws2_32 for other toolchains
+    #pragma comment(lib, "ws2_32.lib")
+  #endif
 #else
   #include <sys/socket.h>
   #include <netinet/in.h>

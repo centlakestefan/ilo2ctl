@@ -5,7 +5,7 @@
 // get_bits read sequence and a zero-run reset trace on stdout, for comparison
 // with the Java oracle.
 #include <cstdio>
-#include "dvc_bits.hpp"
+#include "ilo/dvc_bits.hpp"
 
 using namespace ilo2;
 

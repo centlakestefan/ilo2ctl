@@ -6,8 +6,8 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
-#include "rc4.hpp"
-#include "vmd5.hpp"
+#include "crypto/rc4.hpp"
+#include "crypto/md5.hpp"
 
 using namespace ilo2;
 

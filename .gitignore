@@ -1,5 +1,6 @@
 # Build artifacts / compiler output
 build/
+CMakeUserPresets.json
 *.class
 *.exe
 *.o

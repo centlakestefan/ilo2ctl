@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <vector>
 #include <string>
-#include "dvc_decoder.hpp"
+#include "ilo/dvc_decoder.hpp"
 
 // Forward-declare the one stb function we use, so this header never pulls in the
 // implementation. Exactly one translation unit must

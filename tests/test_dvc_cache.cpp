@@ -4,7 +4,7 @@
 // build/cache_cpp.txt, to be diffed against DvcCacheProbe.java.
 #include <cstdio>
 #include <string>
-#include "dvc_cache.hpp"
+#include "ilo/dvc_cache.hpp"
 
 using namespace ilo2;
 

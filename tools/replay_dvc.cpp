@@ -3,7 +3,7 @@
 // real capture exists, no hardware is needed to re-check the decoder.
 //
 // Build:
-//   g++ -O2 -std=c++17 -o build/replay_dvc.exe cpp/replay_dvc.cpp
+//   cmake -S . -B build/cmake -G Ninja && cmake --build build/cmake --target replay_dvc
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "third_party/stb_image_write.h"
 
@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "cim_png.hpp"
+#include "ilo/cim_png.hpp"
 
 using namespace ilo2;
 
