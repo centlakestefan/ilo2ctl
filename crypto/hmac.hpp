@@ -37,9 +37,9 @@ public:
             h.update(key, klen);
             auto d = h.digest();
             std::memcpy(k, d.data(), d.size());
-        } else {
+        } else if (klen) {
             std::memcpy(k, key, klen);
-        }
+        }   // klen == 0 leaves k all-zero, which is the correct HMAC of an empty key
         for (size_t i = 0; i < BLOCK_SIZE; ++i) {
             ipad_[i] = static_cast<uint8_t>(k[i] ^ 0x36);
             opad_[i] = static_cast<uint8_t>(k[i] ^ 0x5C);

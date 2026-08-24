@@ -39,6 +39,7 @@ set(SELF_ASSERTING_TESTS
     test_bigint
     test_rsa
     test_der
+    test_prf
     test_random
     test_crypto
 )
