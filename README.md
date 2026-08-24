@@ -29,6 +29,7 @@ bytecode** via small Java oracles (reflection / recording subclasses).
 | `ilo/ilo_session.hpp` | iLO login + drc2fram.htm parameter scrape | live iLO 2 |
 | `tools/tls_get.cpp` | HTTPS fetch (replaces `curl --tlsv1.0`) | byte-identical to curl |
 | `ui/console_core.hpp` | front-end seam: framebuffer, dirty rects, input | replay fixtures + live |
+| `ui/sdl_main.cpp` | the standalone console window (SDL3 + Dear ImGui) | live iLO 2 |
 | `tools/console_probe.cpp` | drives the seam like a front end would | live iLO 2 |
 | `ilo/telnet.hpp` | transport: socket, login, DVC trigger, decrypt | real `telnet.run()` |
 | `ilo/dvc_bits.hpp` | DVC bit reader (reversal tables, get/add_bits) | real `cim` reflection |
@@ -55,6 +56,21 @@ cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build/cmake
 cd build/cmake && ctest --output-on-failure
 ```
+
+The GUI is off by default so a bare clone builds and tests with no network:
+
+```
+cmake -S . -B build/gui -G Ninja -DCMAKE_BUILD_TYPE=Release -DILO2_BUILD_GUI=ON
+cmake --build build/gui --target ilo2_console
+build/gui/ilo2_console --host 10.10.123.130
+```
+
+That clones pinned SDL3 (`release-3.4.14`) and Dear ImGui (`v1.92.9`) and links
+them statically, so the result is a single binary that does not depend on what
+a distro happens to ship. `--replay <file.bin>` runs it against a capture
+fixture with no hardware, and `--screenshot out.png --frames N` renders N frames
+and exits, which works under `SDL_VIDEO_DRIVER=dummy` for checking the front end
+without a window.
 
 - Oracles: JDK 17 `javac`/`java`, compiled against `rc175p10.jar` (not tracked).
 - stb: exactly one TU defines `STB_IMAGE_WRITE_IMPLEMENTATION` before including

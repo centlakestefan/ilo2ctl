@@ -83,3 +83,57 @@ target_link_libraries(tls_get PRIVATE ilo2_core)
 
 add_executable(console_probe tools/console_probe.cpp)
 target_link_libraries(console_probe PRIVATE ilo2_core)
+
+# ---------------------------------------------------------------------------
+# GUI (SDL3 + Dear ImGui)
+#
+# Off by default so the test suite never needs a network fetch: everything
+# above this point builds and runs from a bare clone. Turn it on with
+#   cmake -S . -B build/cmake -DILO2_BUILD_GUI=ON
+# and CMake will clone the pinned SDL3 and Dear ImGui tags and build them as
+# part of the project. Pinning matters more than convenience here -- the whole
+# point of vendoring rather than find_package is that both platforms build the
+# same versions without depending on what a distro happens to ship.
+# ---------------------------------------------------------------------------
+option(ILO2_BUILD_GUI "Build the SDL3 console window" OFF)
+
+if(ILO2_BUILD_GUI)
+    include(FetchContent)
+
+    set(SDL_SHARED       OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC       ON  CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+    set(SDL_TESTS        OFF CACHE BOOL "" FORCE)
+    set(SDL_EXAMPLES     OFF CACHE BOOL "" FORCE)
+    set(SDL_INSTALL      OFF CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(SDL3
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG        release-3.4.14
+        GIT_SHALLOW    TRUE)
+    FetchContent_Declare(imgui
+        GIT_REPOSITORY https://github.com/ocornut/imgui.git
+        GIT_TAG        v1.92.9
+        GIT_SHALLOW    TRUE)
+
+    FetchContent_MakeAvailable(SDL3 imgui)
+
+    # Dear ImGui ships no CMakeLists; it is meant to be compiled into the
+    # consumer. The SDL_Renderer backend is enough -- the console is one
+    # streaming texture, so there is nothing an OpenGL backend would add.
+    add_library(imgui STATIC
+        ${imgui_SOURCE_DIR}/imgui.cpp
+        ${imgui_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp)
+    target_include_directories(imgui PUBLIC
+        ${imgui_SOURCE_DIR}
+        ${imgui_SOURCE_DIR}/backends)
+    target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
+
+    add_executable(ilo2_console WIN32 ui/sdl_main.cpp)
+    target_link_libraries(ilo2_console PRIVATE ilo2_core imgui SDL3::SDL3-static)
+    # WIN32 above suppresses the console window on Windows; SDL provides main().
+endif()
