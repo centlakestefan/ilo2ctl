@@ -26,7 +26,9 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 
+#include "ui/connections.hpp"
 #include "ui/console_core.hpp"
+#include "ui/power_control.hpp"
 
 using namespace ilo2;
 
@@ -210,8 +212,36 @@ int main(int argc, char** argv) {
     int connected_frames = 0;
     bool wake_sent = false;
 
+    // Recent connections: host and user only, never the password. Stored in
+    // the per-user preferences directory SDL picks for this platform.
+    std::string connections_path;
+    if (char* pref = SDL_GetPrefPath("centlake", "ilo2_console")) {
+        connections_path = std::string(pref) + "connections.txt";
+        SDL_free(pref);
+    }
+    std::vector<SavedConnection> recent = load_connections(connections_path);
+    bool connection_recorded = false;
+    // With no host on the command line, start from the most recent one so the
+    // usual session is: type the password, press Enter.
+    if (opt.host.empty() && !recent.empty()) {
+        std::snprintf(host_buf, sizeof(host_buf), "%s", recent[0].host.c_str());
+        if (!recent[0].user.empty())
+            std::snprintf(user_buf, sizeof(user_buf), "%s", recent[0].user.c_str());
+    }
+
+    // Server power control over RIBCL, on its own worker; started alongside
+    // the console with the same credentials.
+    PowerControl power;
+    // Destructive power commands take two clicks: the first arms, the second
+    // confirms, and the arm expires on its own.
+    bool         armed = false;
+    RibclCommand armed_cmd = RibclCommand::GetPowerStatus;
+    Uint64       armed_at = 0;
+    constexpr Uint64 ARM_TIMEOUT_MS = 6000;
+
     auto do_connect = [&] {
         ui_error.clear();
+        connection_recorded = false;
         std::string err;
         if (!opt.replay.empty()) {
             if (!core.start_replay(opt.replay, 200000, err)) ui_error = err;
@@ -224,7 +254,18 @@ int main(int argc, char** argv) {
         cfg.refresh_every_sec = opt.refresh_every;
         if (cfg.host.empty()) { ui_error = "no host"; return; }
         if (cfg.pass.empty()) { ui_error = "no password (field, --pass, ILO_PASS or .ilo_pass)"; return; }
-        if (!core.start(cfg, err)) ui_error = err;
+        if (!core.start(cfg, err)) { ui_error = err; return; }
+
+        PowerControl::Config pc;
+        pc.host = cfg.host;
+        pc.user = cfg.user;
+        pc.pass = cfg.pass;
+        power.start(pc);
+    };
+    auto do_disconnect = [&] {
+        core.stop();
+        power.stop();
+        armed = false;
     };
 
     if (opt.autoconnect) do_connect();
@@ -331,14 +372,58 @@ int main(int argc, char** argv) {
                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
         ImGui::PushTextWrapPos(0.0f);
 
-        if (!connected) {
-            ImGui::InputText("host", host_buf, sizeof(host_buf));
-            ImGui::InputText("user", user_buf, sizeof(user_buf));
-            ImGui::InputText("password", pass_buf, sizeof(pass_buf),
-                             ImGuiInputTextFlags_Password);
-            if (ImGui::Button("Connect")) do_connect();
+        // Once the console is up, the credentials are known to be good: record
+        // host and user (never the password) for next time.
+        if (connected && !connection_recorded && opt.replay.empty()) {
+            remember_connection(recent, host_buf, user_buf);
+            if (!connections_path.empty()) save_connections(connections_path, recent);
+            connection_recorded = true;
+        }
+
+        // --- controls (top) -------------------------------------------------
+        const bool idle = core.state() == ConsoleState::Idle ||
+                          core.state() == ConsoleState::Failed ||
+                          core.state() == ConsoleState::Stopped;
+        if (idle) {
+            // Enter in any field connects, as in every login dialog.
+            const ImGuiInputTextFlags enter = ImGuiInputTextFlags_EnterReturnsTrue;
+            bool go = false;
+            go |= ImGui::InputText("host", host_buf, sizeof(host_buf), enter);
+            go |= ImGui::InputText("user", user_buf, sizeof(user_buf), enter);
+            go |= ImGui::InputText("password", pass_buf, sizeof(pass_buf),
+                                   enter | ImGuiInputTextFlags_Password);
+            go |= ImGui::Button("Connect");
+            if (go) do_connect();
+
+            if (!recent.empty()) {
+                ImGui::Spacing();
+                ImGui::TextDisabled("recent");
+                size_t forget = recent.size();
+                for (size_t i = 0; i < recent.size(); ++i) {
+                    const std::string label = recent[i].user.empty()
+                        ? recent[i].host
+                        : recent[i].user + "@" + recent[i].host;
+                    ImGui::PushID(int(i));
+                    // Click fills the fields; double-click connects; the small
+                    // button on the right forgets the entry.
+                    if (ImGui::Selectable(label.c_str(), false,
+                                          ImGuiSelectableFlags_AllowDoubleClick,
+                                          ImVec2(ImGui::GetContentRegionAvail().x - 24, 0))) {
+                        std::snprintf(host_buf, sizeof(host_buf), "%s", recent[i].host.c_str());
+                        std::snprintf(user_buf, sizeof(user_buf), "%s", recent[i].user.c_str());
+                        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) do_connect();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("x")) forget = i;
+                    ImGui::PopID();
+                }
+                if (forget < recent.size()) {
+                    forget_connection(recent, forget);
+                    if (!connections_path.empty()) save_connections(connections_path, recent);
+                }
+            }
         } else {
-            if (ImGui::Button("Disconnect")) core.stop();
+            if (ImGui::Button("Disconnect")) do_disconnect();
             ImGui::SameLine();
             if (ImGui::Button("Refresh")) core.request_refresh();
             ImGui::SameLine();
@@ -348,28 +433,93 @@ int main(int argc, char** argv) {
             ImGui::Checkbox("forward keyboard and mouse", &send_input);
         }
 
-        ImGui::Separator();
-        ImGui::Text("state   : %s", console_state_name(core.state()));
-        const std::string status = core.status();
-        if (!status.empty()) ImGui::Text("status  : %s", status.c_str());
-        if (fb_w) ImGui::Text("screen  : %dx%d", fb_w, fb_h);
-
-        const unsigned long long p = core.pastes(), c = core.changed_pastes();
-        if (p) {
-            ImGui::Text("tiles   : %llu received, %llu changed (%.1f%% redundant)",
-                        p, c, 100.0 * double(p - c) / double(p));
-        }
-        ImGui::Text("uploads : %llu over %llu changed frames", uploads, frames);
-        ImGui::Text("%.1f FPS", double(ImGui::GetIO().Framerate));
-
-        if (!ui_error.empty()) {
-            ImGui::Separator();
+        // Errors belong next to the controls that caused them.
+        if (!ui_error.empty())
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", ui_error.c_str());
-        }
         const std::string core_err = core.error();
-        if (!core_err.empty()) {
-            ImGui::Separator();
+        if (!core_err.empty())
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", core_err.c_str());
+
+        // --- server power (RIBCL) ---------------------------------------------
+        if (power.running()) {
+            const PowerControl::Snapshot ps = power.snapshot();
+            ImGui::Spacing();
+            ImGui::SeparatorText("Server");
+            if (ps.host_power.empty()) ImGui::Text("power : %s", ps.busy ? "reading..." : "unknown");
+            else                       ImGui::Text("power : %s%s", ps.host_power.c_str(), ps.busy ? "  (busy)" : "");
+
+            if (armed && SDL_GetTicks() - armed_at > ARM_TIMEOUT_MS) armed = false;
+
+            // One row of buttons; the destructive ones arm on the first click
+            // and act on the second, so a stray click on the panel can never
+            // reset the server.
+            auto arm_button = [&](const char* label, RibclCommand cmd) {
+                if (armed && armed_cmd == cmd) {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.9f, 0.3f, 0.3f, 1.0f));
+                    const std::string confirm = std::string("Confirm ") + label;
+                    if (ImGui::Button(confirm.c_str())) { power.request(cmd); armed = false; }
+                    ImGui::PopStyleColor(2);
+                } else if (ImGui::Button(label)) {
+                    armed = true;
+                    armed_cmd = cmd;
+                    armed_at = SDL_GetTicks();
+                }
+            };
+            ImGui::BeginDisabled(ps.busy);
+            if (ps.host_power != "ON") {
+                if (ImGui::Button("Power on")) power.request(RibclCommand::PowerOn);
+            } else {
+                arm_button("Shut down", RibclCommand::PowerOff);
+                ImGui::SameLine();
+                arm_button("Force off", RibclCommand::ForcePowerOff);
+            }
+            arm_button("Reset", RibclCommand::Reset);
+            ImGui::SameLine();
+            arm_button("Cold boot", RibclCommand::ColdBoot);
+            ImGui::EndDisabled();
+            if (armed) {
+                ImGui::SameLine();
+                if (ImGui::SmallButton("cancel")) armed = false;
+            }
+            if (ImGui::Button("UID on"))  power.request(RibclCommand::UidOn);
+            ImGui::SameLine();
+            if (ImGui::Button("UID off")) power.request(RibclCommand::UidOff);
+
+            if (!ps.last_action.empty()) {
+                const ImVec4 col = ps.error ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
+                                            : ImVec4(0.6f, 0.9f, 0.6f, 1.0f);
+                ImGui::TextColored(col, "%s: %s", ps.last_action.c_str(), ps.last_result.c_str());
+            } else if (ps.error) {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", ps.last_result.c_str());
+            }
+        }
+
+        // --- status (bottom) --------------------------------------------------
+        // Pinned to the bottom of the panel so the controls stay put and the
+        // counters stay out of the way. The block's height is measured as it is
+        // drawn and used to place it next frame; one frame of lag is invisible.
+        static float status_height = 0.0f;
+        {
+            const float bottom = ImGui::GetWindowHeight() - ImGui::GetStyle().WindowPadding.y;
+            const float y = bottom - status_height;
+            if (y > ImGui::GetCursorPosY()) ImGui::SetCursorPosY(y);
+            const float start = ImGui::GetCursorPosY();
+
+            ImGui::Separator();
+            ImGui::Text("state   : %s", console_state_name(core.state()));
+            const std::string status = core.status();
+            if (!status.empty()) ImGui::Text("status  : %s", status.c_str());
+            if (fb_w) ImGui::Text("screen  : %dx%d", fb_w, fb_h);
+            const unsigned long long p = core.pastes(), c = core.changed_pastes();
+            if (p) {
+                ImGui::Text("tiles   : %llu received, %llu changed (%.1f%% redundant)",
+                            p, c, 100.0 * double(p - c) / double(p));
+            }
+            ImGui::Text("uploads : %llu over %llu changed frames", uploads, frames);
+            ImGui::Text("%.1f FPS", double(ImGui::GetIO().Framerate));
+
+            status_height = ImGui::GetCursorPosY() - start;
         }
         ImGui::PopTextWrapPos();
         ImGui::End();
