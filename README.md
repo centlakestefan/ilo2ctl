@@ -73,7 +73,7 @@ build/gui/ilo2_console --host 10.10.123.130
 That clones pinned SDL3 (`release-3.4.14`) and Dear ImGui (`v1.92.9`) and links
 them statically, so the result is a single binary that does not depend on what
 a distro happens to ship. `--replay <file.bin>` runs it against a capture
-fixture with no hardware, and `--screenshot out.png --frames N` renders N frames
+fixture with no hardware, `--tab power|health` picks the starting tab, and `--screenshot out.png --frames N` renders N frames
 and exits, which works under `SDL_VIDEO_DRIVER=dummy` for checking the front end
 without a window.
 

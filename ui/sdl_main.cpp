@@ -52,6 +52,9 @@ struct Options {
     // anything that types a character would be a change to the server rather
     // than a nudge.
     bool        wake = false;
+    // Which panel tab to start on: console | power | health. Mostly for
+    // screenshots of the other two.
+    std::string tab = "console";
 };
 
 // The control panel is a fixed strip down the left edge; the console gets
@@ -127,6 +130,7 @@ void parse_args(int argc, char** argv, Options& o) {
         else if (a == "--screenshot")    o.screenshot = next();
         else if (a == "--frames")        o.frames_before_shot = std::atoi(next().c_str());
         else if (a == "--wake")          o.wake = true;
+        else if (a == "--tab")           o.tab = next();
     }
 }
 
@@ -370,7 +374,6 @@ int main(int argc, char** argv) {
         ImGui::Begin("Console", nullptr,
                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
-        ImGui::PushTextWrapPos(0.0f);
 
         // Once the console is up, the credentials are known to be good: record
         // host and user (never the password) for next time.
@@ -380,215 +383,267 @@ int main(int argc, char** argv) {
             connection_recorded = true;
         }
 
-        // --- controls (top) -------------------------------------------------
-        const bool idle = core.state() == ConsoleState::Idle ||
-                          core.state() == ConsoleState::Failed ||
-                          core.state() == ConsoleState::Stopped;
-        if (idle) {
-            // Enter in any field connects, as in every login dialog.
-            const ImGuiInputTextFlags enter = ImGuiInputTextFlags_EnterReturnsTrue;
-            bool go = false;
-            go |= ImGui::InputText("host", host_buf, sizeof(host_buf), enter);
-            go |= ImGui::InputText("user", user_buf, sizeof(user_buf), enter);
-            go |= ImGui::InputText("password", pass_buf, sizeof(pass_buf),
-                                   enter | ImGuiInputTextFlags_Password);
-            go |= ImGui::Button("Connect");
-            if (go) do_connect();
+        const ImVec4 ok_col  (0.6f, 0.9f, 0.6f, 1.0f);
+        const ImVec4 warn_col(1.0f, 0.8f, 0.3f, 1.0f);
+        const ImVec4 bad_col (1.0f, 0.4f, 0.4f, 1.0f);
 
-            if (!recent.empty()) {
-                ImGui::Spacing();
-                ImGui::TextDisabled("recent");
-                size_t forget = recent.size();
-                for (size_t i = 0; i < recent.size(); ++i) {
-                    const std::string label = recent[i].user.empty()
-                        ? recent[i].host
-                        : recent[i].user + "@" + recent[i].host;
-                    ImGui::PushID(int(i));
-                    // Click fills the fields; double-click connects; the small
-                    // button on the right forgets the entry.
-                    if (ImGui::Selectable(label.c_str(), false,
-                                          ImGuiSelectableFlags_AllowDoubleClick,
-                                          ImVec2(ImGui::GetContentRegionAvail().x - 24, 0))) {
-                        std::snprintf(host_buf, sizeof(host_buf), "%s", recent[i].host.c_str());
-                        std::snprintf(user_buf, sizeof(user_buf), "%s", recent[i].user.c_str());
-                        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) do_connect();
+        // The panel is three tabs over a status block pinned to the bottom.
+        // The tab content lives in a child sized to leave the status its room,
+        // so a long sensor list scrolls instead of pushing the status off.
+        // The status height is measured as it is drawn and used next frame.
+        static float status_height = 0.0f;
+        const float tabs_height = ImGui::GetContentRegionAvail().y - status_height -
+                                  ImGui::GetStyle().ItemSpacing.y;
+        ImGui::BeginChild("tabs", ImVec2(0, std::max(tabs_height, 50.0f)), ImGuiChildFlags_None);
+        if (ImGui::BeginTabBar("panel")) {
+            // --tab picks the initial tab; only the first frame asks for it,
+            // after which the user's clicks own the selection.
+            static bool first_frame = true;
+            auto tab_flags = [&](const char* name) {
+                return (first_frame && opt.tab == name) ? ImGuiTabItemFlags_SetSelected
+                                                        : ImGuiTabItemFlags_None;
+            };
+
+            // --- Console ---------------------------------------------------
+            if (ImGui::BeginTabItem("Console", nullptr, tab_flags("console"))) {
+                const bool idle = core.state() == ConsoleState::Idle ||
+                                  core.state() == ConsoleState::Failed ||
+                                  core.state() == ConsoleState::Stopped;
+                if (idle) {
+                    // Enter in any field connects, as in every login dialog.
+                    const ImGuiInputTextFlags enter = ImGuiInputTextFlags_EnterReturnsTrue;
+                    bool go = false;
+                    go |= ImGui::InputText("host", host_buf, sizeof(host_buf), enter);
+                    go |= ImGui::InputText("user", user_buf, sizeof(user_buf), enter);
+                    go |= ImGui::InputText("password", pass_buf, sizeof(pass_buf),
+                                           enter | ImGuiInputTextFlags_Password);
+                    go |= ImGui::Button("Connect");
+                    if (go) do_connect();
+
+                    if (!recent.empty()) {
+                        ImGui::Spacing();
+                        ImGui::TextDisabled("recent");
+                        size_t forget = recent.size();
+                        for (size_t i = 0; i < recent.size(); ++i) {
+                            const std::string label = recent[i].user.empty()
+                                ? recent[i].host
+                                : recent[i].user + "@" + recent[i].host;
+                            ImGui::PushID(int(i));
+                            // Click fills the fields; double-click connects; the
+                            // small button on the right forgets the entry.
+                            if (ImGui::Selectable(label.c_str(), false,
+                                                  ImGuiSelectableFlags_AllowDoubleClick,
+                                                  ImVec2(ImGui::GetContentRegionAvail().x - 24, 0))) {
+                                std::snprintf(host_buf, sizeof(host_buf), "%s", recent[i].host.c_str());
+                                std::snprintf(user_buf, sizeof(user_buf), "%s", recent[i].user.c_str());
+                                if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) do_connect();
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::SmallButton("x")) forget = i;
+                            ImGui::PopID();
+                        }
+                        if (forget < recent.size()) {
+                            forget_connection(recent, forget);
+                            if (!connections_path.empty()) save_connections(connections_path, recent);
+                        }
                     }
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("x")) forget = i;
-                    ImGui::PopID();
-                }
-                if (forget < recent.size()) {
-                    forget_connection(recent, forget);
-                    if (!connections_path.empty()) save_connections(connections_path, recent);
-                }
-            }
-        } else {
-            if (ImGui::Button("Disconnect")) do_disconnect();
-            ImGui::SameLine();
-            if (ImGui::Button("Refresh")) core.request_refresh();
-            ImGui::SameLine();
-            // The real key combination never reaches an application on either
-            // platform, so it has to be a button.
-            if (ImGui::Button("Ctrl-Alt-Del")) core.send_ctrl_alt_del();
-            ImGui::Checkbox("forward keyboard and mouse", &send_input);
-        }
-
-        // Errors belong next to the controls that caused them.
-        if (!ui_error.empty())
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", ui_error.c_str());
-        const std::string core_err = core.error();
-        if (!core_err.empty())
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", core_err.c_str());
-
-        // --- server power (RIBCL) ---------------------------------------------
-        if (power.running()) {
-            const PowerControl::Snapshot ps = power.snapshot();
-            ImGui::Spacing();
-            ImGui::SeparatorText("Server");
-            if (ps.host_power.empty()) ImGui::Text("power : %s", ps.busy ? "reading..." : "unknown");
-            else                       ImGui::Text("power : %s%s", ps.host_power.c_str(), ps.busy ? "  (busy)" : "");
-
-            if (armed && SDL_GetTicks() - armed_at > ARM_TIMEOUT_MS) armed = false;
-
-            // One row of buttons; the destructive ones arm on the first click
-            // and act on the second, so a stray click on the panel can never
-            // reset the server.
-            auto arm_button = [&](const char* label, RibclCommand cmd) {
-                if (armed && armed_cmd == cmd) {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.9f, 0.3f, 0.3f, 1.0f));
-                    const std::string confirm = std::string("Confirm ") + label;
-                    if (ImGui::Button(confirm.c_str())) { power.request(cmd); armed = false; }
-                    ImGui::PopStyleColor(2);
-                } else if (ImGui::Button(label)) {
-                    armed = true;
-                    armed_cmd = cmd;
-                    armed_at = SDL_GetTicks();
-                }
-            };
-            ImGui::BeginDisabled(ps.busy);
-            if (ps.host_power != "ON") {
-                if (ImGui::Button("Power on")) power.request(RibclCommand::PowerOn);
-            } else {
-                arm_button("Shut down", RibclCommand::PowerOff);
-                ImGui::SameLine();
-                arm_button("Force off", RibclCommand::ForcePowerOff);
-            }
-            arm_button("Reset", RibclCommand::Reset);
-            ImGui::SameLine();
-            arm_button("Cold boot", RibclCommand::ColdBoot);
-            ImGui::EndDisabled();
-            if (armed) {
-                ImGui::SameLine();
-                if (ImGui::SmallButton("cancel")) armed = false;
-            }
-            if (ImGui::Button("UID on"))  power.request(RibclCommand::UidOn);
-            ImGui::SameLine();
-            if (ImGui::Button("UID off")) power.request(RibclCommand::UidOff);
-
-            if (!ps.last_action.empty()) {
-                const ImVec4 col = ps.error ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
-                                            : ImVec4(0.6f, 0.9f, 0.6f, 1.0f);
-                ImGui::TextColored(col, "%s: %s", ps.last_action.c_str(), ps.last_result.c_str());
-            } else if (ps.error) {
-                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", ps.last_result.c_str());
-            }
-
-            // --- health (GET_EMBEDDED_HEALTH / GET_POWER_READINGS) ---------
-            // A one-line summary always; the sensor tables fold away so the
-            // panel stays short unless something is worth looking at.
-            const ImVec4 ok_col  (0.6f, 0.9f, 0.6f, 1.0f);
-            const ImVec4 warn_col(1.0f, 0.8f, 0.3f, 1.0f);
-            const ImVec4 bad_col (1.0f, 0.4f, 0.4f, 1.0f);
-            auto status_col = [&](const std::string& s) -> ImVec4 {
-                if (s.empty() || s == "Ok" || s == "n/a" || s == "Not Installed") return ImGui::GetStyle().Colors[ImGuiCol_Text];
-                return bad_col;
-            };
-            if (ps.watts.valid || ps.health.valid) {
-                ImGui::Spacing();
-                ImGui::SeparatorText("Health");
-            }
-            if (ps.watts.valid) {
-                ImGui::Text("power : %d W", ps.watts.present);
-                ImGui::SameLine();
-                ImGui::TextDisabled("(avg %d, max %d)", ps.watts.average, ps.watts.maximum);
-            }
-            if (ps.health.valid) {
-                const HealthData& h = ps.health;
-                const HealthGlance& g = h.glance;
-                const bool all_ok = health_all_ok(g);
-                ImGui::Text("health: ");
-                ImGui::SameLine();
-                if (all_ok) {
-                    ImGui::TextColored(ok_col, "all Ok");
                 } else {
-                    // Name the subsystems that are not, since that is the
-                    // only time anyone reads this line.
-                    ImGui::TextColored(bad_col, "fans %s, temps %s, vrm %s, psu %s, drives %s",
-                                       g.fans.c_str(), g.temperature.c_str(), g.vrm.c_str(),
-                                       g.supplies.c_str(), g.drives.c_str());
+                    if (ImGui::Button("Disconnect")) do_disconnect();
+                    ImGui::SameLine();
+                    if (ImGui::Button("Refresh")) core.request_refresh();
+                    ImGui::SameLine();
+                    // The real key combination never reaches an application on
+                    // either platform, so it has to be a button.
+                    if (ImGui::Button("Ctrl-Alt-Del")) core.send_ctrl_alt_del();
+                    ImGui::Checkbox("forward keyboard and mouse", &send_input);
                 }
 
-                const HealthTemp* hot = hottest(h);
-                char hdr[96];
-                if (hot) std::snprintf(hdr, sizeof(hdr), "Temperatures  (%s %d C)###temps", hot->location.c_str(), hot->reading);
-                else     std::snprintf(hdr, sizeof(hdr), "Temperatures###temps");
-                if (ImGui::CollapsingHeader(hdr)) {
-                    if (ImGui::BeginTable("temps", 3, ImGuiTableFlags_SizingFixedFit)) {
-                        for (const auto& t : h.temps) {
-                            if (t.reading < 0) continue;      // not fitted
-                            ImVec4 col = ImGui::GetStyle().Colors[ImGuiCol_Text];
-                            if (t.critical >= 0 && t.reading >= t.critical)     col = bad_col;
-                            else if (t.caution >= 0 && t.reading >= t.caution)  col = warn_col;
-                            ImGui::TableNextRow();
-                            ImGui::TableNextColumn(); ImGui::TextUnformatted(t.location.c_str());
-                            ImGui::TableNextColumn(); ImGui::TextColored(col, "%3d C", t.reading);
-                            ImGui::TableNextColumn(); ImGui::TextDisabled("/ %d", t.caution);
-                        }
-                        ImGui::EndTable();
-                    }
+                // Errors belong next to the controls that caused them.
+                if (!ui_error.empty()) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, bad_col);
+                    ImGui::TextWrapped("%s", ui_error.c_str());
+                    ImGui::PopStyleColor();
                 }
-                if (ImGui::CollapsingHeader("Fans###fans")) {
-                    if (ImGui::BeginTable("fans", 3, ImGuiTableFlags_SizingFixedFit)) {
-                        for (const auto& f : h.fans) {
-                            ImGui::TableNextRow();
-                            ImGui::TableNextColumn(); ImGui::TextUnformatted(f.label.c_str());
-                            ImGui::TableNextColumn(); ImGui::Text("%3d%%", f.speed_pct);
-                            ImGui::TableNextColumn(); ImGui::TextColored(status_col(f.status), "%s", f.status.c_str());
-                        }
-                        ImGui::EndTable();
-                    }
+                const std::string core_err = core.error();
+                if (!core_err.empty()) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, bad_col);
+                    ImGui::TextWrapped("%s", core_err.c_str());
+                    ImGui::PopStyleColor();
                 }
-                if (ImGui::CollapsingHeader("Power supplies & drives###psu")) {
-                    for (const auto& s : h.supplies) {
-                        ImGui::TextUnformatted(s.label.c_str());
-                        ImGui::SameLine();
-                        ImGui::TextColored(status_col(s.status), "%s", s.status.c_str());
-                    }
-                    if (ImGui::BeginTable("drives", 3, ImGuiTableFlags_SizingFixedFit)) {
-                        for (const auto& d : h.drives) {
-                            ImGui::TableNextRow();
-                            ImGui::TableNextColumn(); ImGui::Text("bay %d", d.bay);
-                            ImGui::TableNextColumn(); ImGui::TextDisabled("%s", d.product.c_str());
-                            ImGui::TableNextColumn(); ImGui::TextColored(status_col(d.status), "%s", d.status.c_str());
-                        }
-                        ImGui::EndTable();
-                    }
-                }
+                ImGui::EndTabItem();
             }
+
+            // --- Power -----------------------------------------------------
+            const PowerControl::Snapshot ps = power.running() ? power.snapshot()
+                                                              : PowerControl::Snapshot();
+            if (ImGui::BeginTabItem("Power", nullptr, tab_flags("power"))) {
+                if (!power.running()) {
+                    ImGui::TextDisabled("connect to a server first");
+                } else {
+                    if (ps.host_power.empty()) ImGui::Text("power : %s", ps.busy ? "reading..." : "unknown");
+                    else                       ImGui::Text("power : %s%s", ps.host_power.c_str(), ps.busy ? "  (busy)" : "");
+                    if (ps.watts.valid) {
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("%d W", ps.watts.present);
+                    }
+                    ImGui::Spacing();
+
+                    if (armed && SDL_GetTicks() - armed_at > ARM_TIMEOUT_MS) armed = false;
+
+                    // The destructive commands arm on the first click and act
+                    // on the second, so a stray click on the panel can never
+                    // reset the server.
+                    auto arm_button = [&](const char* label, RibclCommand cmd) {
+                        if (armed && armed_cmd == cmd) {
+                            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+                            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.9f, 0.3f, 0.3f, 1.0f));
+                            const std::string confirm = std::string("Confirm ") + label;
+                            if (ImGui::Button(confirm.c_str())) { power.request(cmd); armed = false; }
+                            ImGui::PopStyleColor(2);
+                        } else if (ImGui::Button(label)) {
+                            armed = true;
+                            armed_cmd = cmd;
+                            armed_at = SDL_GetTicks();
+                        }
+                    };
+                    ImGui::BeginDisabled(ps.busy);
+                    if (ps.host_power != "ON") {
+                        if (ImGui::Button("Power on")) power.request(RibclCommand::PowerOn);
+                    } else {
+                        arm_button("Shut down", RibclCommand::PowerOff);
+                        ImGui::SameLine();
+                        arm_button("Force off", RibclCommand::ForcePowerOff);
+                    }
+                    arm_button("Reset", RibclCommand::Reset);
+                    ImGui::SameLine();
+                    arm_button("Cold boot", RibclCommand::ColdBoot);
+                    ImGui::EndDisabled();
+                    if (armed) {
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("cancel")) armed = false;
+                    }
+                    ImGui::Spacing();
+                    ImGui::TextDisabled("UID light");
+                    ImGui::SameLine();
+                    if (ImGui::Button("on"))  power.request(RibclCommand::UidOn);
+                    ImGui::SameLine();
+                    if (ImGui::Button("off")) power.request(RibclCommand::UidOff);
+
+                    if (!ps.last_action.empty()) {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ps.error ? bad_col : ok_col);
+                        ImGui::TextWrapped("%s: %s", ps.last_action.c_str(), ps.last_result.c_str());
+                        ImGui::PopStyleColor();
+                    } else if (ps.error) {
+                        ImGui::PushStyleColor(ImGuiCol_Text, bad_col);
+                        ImGui::TextWrapped("%s", ps.last_result.c_str());
+                        ImGui::PopStyleColor();
+                    }
+                }
+                ImGui::EndTabItem();
+            }
+
+            // --- Health ----------------------------------------------------
+            if (ImGui::BeginTabItem("Health", nullptr, tab_flags("health"))) {
+                auto status_col = [&](const std::string& s) -> ImVec4 {
+                    if (s.empty() || s == "Ok" || s == "n/a" || s == "Not Installed")
+                        return ImGui::GetStyle().Colors[ImGuiCol_Text];
+                    return bad_col;
+                };
+                if (!power.running()) {
+                    ImGui::TextDisabled("connect to a server first");
+                } else if (!ps.watts.valid && !ps.health.valid) {
+                    ImGui::TextDisabled("reading...");
+                }
+                if (ps.watts.valid) {
+                    ImGui::Text("power : %d W", ps.watts.present);
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(avg %d, max %d)", ps.watts.average, ps.watts.maximum);
+                }
+                if (ps.health.valid) {
+                    const HealthData& h = ps.health;
+                    const HealthGlance& g = h.glance;
+                    ImGui::Text("health: ");
+                    ImGui::SameLine();
+                    if (health_all_ok(g)) {
+                        ImGui::TextColored(ok_col, "all Ok");
+                    } else {
+                        // Name the subsystems that are not, since that is the
+                        // only time anyone reads this line.
+                        ImGui::PushStyleColor(ImGuiCol_Text, bad_col);
+                        ImGui::TextWrapped("fans %s, temps %s, vrm %s, psu %s, drives %s",
+                                           g.fans.c_str(), g.temperature.c_str(), g.vrm.c_str(),
+                                           g.supplies.c_str(), g.drives.c_str());
+                        ImGui::PopStyleColor();
+                    }
+                    if (!g.fan_redundancy.empty() || !g.supply_redundancy.empty()) {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+                        ImGui::TextWrapped("fans: %s, psu: %s",
+                                           g.fan_redundancy.c_str(), g.supply_redundancy.c_str());
+                        ImGui::PopStyleColor();
+                    }
+
+                    const ImGuiTableFlags tf = ImGuiTableFlags_SizingFixedFit |
+                                               ImGuiTableFlags_RowBg | ImGuiTableFlags_NoClip;
+                    const HealthTemp* hot = hottest(h);
+                    char hdr[96];
+                    if (hot) std::snprintf(hdr, sizeof(hdr), "Temperatures  (max %d C)###temps", hot->reading);
+                    else     std::snprintf(hdr, sizeof(hdr), "Temperatures###temps");
+                    if (ImGui::CollapsingHeader(hdr, ImGuiTreeNodeFlags_DefaultOpen)) {
+                        if (ImGui::BeginTable("temps", 3, tf)) {
+                            for (const auto& t : h.temps) {
+                                if (t.reading < 0) continue;      // not fitted
+                                ImVec4 col = ImGui::GetStyle().Colors[ImGuiCol_Text];
+                                if (t.critical >= 0 && t.reading >= t.critical)     col = bad_col;
+                                else if (t.caution >= 0 && t.reading >= t.caution)  col = warn_col;
+                                ImGui::TableNextRow();
+                                ImGui::TableNextColumn(); ImGui::TextUnformatted(t.location.c_str());
+                                ImGui::TableNextColumn(); ImGui::TextColored(col, "%3d C", t.reading);
+                                ImGui::TableNextColumn(); ImGui::TextDisabled("caution %d", t.caution);
+                            }
+                            ImGui::EndTable();
+                        }
+                    }
+                    if (ImGui::CollapsingHeader("Fans###fans", ImGuiTreeNodeFlags_DefaultOpen)) {
+                        if (ImGui::BeginTable("fans", 3, tf)) {
+                            for (const auto& f : h.fans) {
+                                ImGui::TableNextRow();
+                                ImGui::TableNextColumn(); ImGui::TextUnformatted(f.label.c_str());
+                                ImGui::TableNextColumn(); ImGui::Text("%3d%%", f.speed_pct);
+                                ImGui::TableNextColumn(); ImGui::TextColored(status_col(f.status), "%s", f.status.c_str());
+                            }
+                            ImGui::EndTable();
+                        }
+                    }
+                    if (ImGui::CollapsingHeader("Power supplies###psu", ImGuiTreeNodeFlags_DefaultOpen)) {
+                        for (const auto& s : h.supplies) {
+                            ImGui::TextUnformatted(s.label.c_str());
+                            ImGui::SameLine();
+                            ImGui::TextColored(status_col(s.status), "%s", s.status.c_str());
+                        }
+                    }
+                    if (ImGui::CollapsingHeader("Drives###drives", ImGuiTreeNodeFlags_DefaultOpen)) {
+                        if (ImGui::BeginTable("drives", 3, tf)) {
+                            for (const auto& d : h.drives) {
+                                ImGui::TableNextRow();
+                                ImGui::TableNextColumn(); ImGui::Text("bay %d", d.bay);
+                                ImGui::TableNextColumn(); ImGui::TextColored(status_col(d.status), "%s", d.status.c_str());
+                                ImGui::TableNextColumn(); ImGui::TextDisabled("%s", d.product.c_str());
+                            }
+                            ImGui::EndTable();
+                        }
+                    }
+                }
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+            first_frame = false;
         }
+        ImGui::EndChild();
 
         // --- status (bottom) --------------------------------------------------
-        // Pinned to the bottom of the panel so the controls stay put and the
-        // counters stay out of the way. The block's height is measured as it is
-        // drawn and used to place it next frame; one frame of lag is invisible.
-        static float status_height = 0.0f;
         {
-            const float bottom = ImGui::GetWindowHeight() - ImGui::GetStyle().WindowPadding.y;
-            const float y = bottom - status_height;
-            if (y > ImGui::GetCursorPosY()) ImGui::SetCursorPosY(y);
             const float start = ImGui::GetCursorPosY();
-
+            ImGui::PushTextWrapPos(0.0f);
             ImGui::Separator();
             ImGui::Text("state   : %s", console_state_name(core.state()));
             const std::string status = core.status();
@@ -601,10 +656,9 @@ int main(int argc, char** argv) {
             }
             ImGui::Text("uploads : %llu over %llu changed frames", uploads, frames);
             ImGui::Text("%.1f FPS", double(ImGui::GetIO().Framerate));
-
+            ImGui::PopTextWrapPos();
             status_height = ImGui::GetCursorPosY() - start;
         }
-        ImGui::PopTextWrapPos();
         ImGui::End();
 
         ImGui::Render();
