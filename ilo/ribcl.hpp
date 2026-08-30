@@ -33,6 +33,8 @@ namespace ilo2 {
 // so a UI can draw a line between the two.
 enum class RibclCommand {
     GetPowerStatus,     // GET_HOST_POWER_STATUS
+    GetEmbeddedHealth,  // GET_EMBEDDED_HEALTH   (fans, temps, PSUs, drives)
+    GetPowerReadings,   // GET_POWER_READINGS    (watts: present/avg/max/min)
     PowerOn,            // SET_HOST_POWER Yes  (momentary press: no-op if on)
     PowerOff,           // SET_HOST_POWER No   (momentary press: OS shutdown)
     ForcePowerOff,      // HOLD_PWR_BTN        (hard off)
@@ -43,12 +45,16 @@ enum class RibclCommand {
 };
 
 inline bool ribcl_is_write(RibclCommand c) {
-    return c != RibclCommand::GetPowerStatus;
+    return c != RibclCommand::GetPowerStatus &&
+           c != RibclCommand::GetEmbeddedHealth &&
+           c != RibclCommand::GetPowerReadings;
 }
 
 inline const char* ribcl_command_name(RibclCommand c) {
     switch (c) {
-        case RibclCommand::GetPowerStatus: return "power status";
+        case RibclCommand::GetPowerStatus:    return "power status";
+        case RibclCommand::GetEmbeddedHealth: return "health";
+        case RibclCommand::GetPowerReadings:  return "power readings";
         case RibclCommand::PowerOn:        return "power on";
         case RibclCommand::PowerOff:       return "power off";
         case RibclCommand::ForcePowerOff:  return "force power off";
@@ -64,7 +70,9 @@ inline const char* ribcl_command_name(RibclCommand c) {
 inline std::string ribcl_body(RibclCommand c) {
     const char* inner = "";
     switch (c) {
-        case RibclCommand::GetPowerStatus: inner = "<GET_HOST_POWER_STATUS/>";        break;
+        case RibclCommand::GetPowerStatus:    inner = "<GET_HOST_POWER_STATUS/>";     break;
+        case RibclCommand::GetEmbeddedHealth: inner = "<GET_EMBEDDED_HEALTH/>";       break;
+        case RibclCommand::GetPowerReadings:  inner = "<GET_POWER_READINGS/>";        break;
         case RibclCommand::PowerOn:        inner = "<SET_HOST_POWER HOST_POWER=\"Yes\"/>"; break;
         case RibclCommand::PowerOff:       inner = "<SET_HOST_POWER HOST_POWER=\"No\"/>";  break;
         case RibclCommand::ForcePowerOff:  inner = "<HOLD_PWR_BTN/>";                 break;
@@ -165,7 +173,9 @@ inline std::string ribcl_document(const std::string& user, const std::string& pa
 // that silence as the end. The one early exit is a status read: its answer is
 // usable the moment HOST_POWER shows up.
 inline bool ribcl_reply_complete(const std::string& raw) {
-    return raw.find("HOST_POWER=") != std::string::npos;
+    return raw.find("HOST_POWER=") != std::string::npos ||
+           raw.find("</GET_EMBEDDED_HEALTH_DATA>") != std::string::npos ||
+           raw.find("</GET_POWER_READINGS>") != std::string::npos;
 }
 
 // Drive one exchange over an already-connected client. Reads until `done`

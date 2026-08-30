@@ -50,6 +50,7 @@ set(SELF_ASSERTING_TESTS
     test_console_core
     test_ribcl
     test_connections
+    test_health
     test_random
     test_crypto
 )

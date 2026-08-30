@@ -16,6 +16,7 @@
 #include <string>
 #include <thread>
 
+#include "ilo/health.hpp"
 #include "ilo/ribcl.hpp"
 
 namespace ilo2 {
@@ -28,6 +29,7 @@ public:
         std::string user;
         std::string pass;
         int         poll_sec = 10;      // status poll interval while idle; 0 = never
+        int         health_sec = 30;    // health + wattage poll interval; 0 = never
     };
 
     struct Snapshot {
@@ -36,6 +38,8 @@ public:
         std::string last_result;        // its outcome, human-readable
         bool        busy = false;       // a request is in flight
         bool        error = false;      // last_result is an error
+        HealthData    health;           // .valid once the first report is in
+        PowerReadings watts;            // .valid once the first reading is in
     };
 
     ~PowerControl() { stop(); }
@@ -78,8 +82,10 @@ public:
 
 private:
     void worker() {
-        // First thing: learn the state.
+        using clock = std::chrono::steady_clock;
+        // First thing: learn the state, then the health.
         bool poll_due = true;
+        clock::time_point last_health{};        // epoch: health is due immediately
         for (;;) {
             RibclCommand cmd;
             {
@@ -89,15 +95,23 @@ private:
                     cv_.wait_for(lk, wait, [&] { return !run_ || !queue_.empty(); });
                 }
                 if (!run_) return;
+                const bool health_due = cfg_.health_sec > 0 &&
+                    clock::now() - last_health >= std::chrono::seconds(cfg_.health_sec);
                 if (!queue_.empty()) {
                     cmd = queue_.front();
                     queue_.pop_front();
-                } else if (cfg_.poll_sec > 0 || poll_due) {
+                } else if (poll_due || cfg_.poll_sec > 0) {
                     cmd = RibclCommand::GetPowerStatus;
                 } else {
                     continue;
                 }
                 poll_due = false;
+                // Health rides along after a status poll, as two extra reads.
+                if (cmd == RibclCommand::GetPowerStatus && health_due) {
+                    queue_.push_front(RibclCommand::GetPowerReadings);
+                    queue_.push_front(RibclCommand::GetEmbeddedHealth);
+                    last_health = clock::now();
+                }
                 snap_.busy = true;
                 if (ribcl_is_write(cmd)) snap_.last_action = ribcl_command_name(cmd);
             }
@@ -115,6 +129,16 @@ private:
                 continue;
             }
             if (!reply.host_power.empty()) snap_.host_power = reply.host_power;
+            if (cmd == RibclCommand::GetEmbeddedHealth) {
+                const HealthData h = parse_embedded_health(reply.raw);
+                if (h.valid) snap_.health = h;
+                continue;
+            }
+            if (cmd == RibclCommand::GetPowerReadings) {
+                const PowerReadings p = parse_power_readings(reply.raw);
+                if (p.valid) snap_.watts = p;
+                continue;
+            }
             if (ribcl_is_write(cmd)) {
                 snap_.error = !reply.ok;
                 snap_.last_result = reply.ok ? "ok" : (reply.message.empty() ? "failed" : reply.message);

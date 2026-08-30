@@ -1,0 +1,401 @@
+<?xml version="1.0"?>
+<RIBCL VERSION="2.22">
+<RESPONSE
+    STATUS="0x0000"
+    MESSAGE='No error'
+     />
+</RIBCL>
+<?xml version="1.0"?>
+<RIBCL VERSION="2.22">
+<RESPONSE
+    STATUS="0x0000"
+    MESSAGE='No error'
+     />
+</RIBCL>
+<?xml version="1.0"?>
+<RIBCL VERSION="2.22">
+<RESPONSE
+    STATUS="0x0000"
+    MESSAGE='No error'
+     />
+</RIBCL>
+<?xml version="1.0"?>
+<RIBCL VERSION="2.22">
+<RESPONSE
+    STATUS="0x0000"
+    MESSAGE='No error'
+     />
+</RIBCL>
+<?xml version="1.0"?>
+<RIBCL VERSION="2.22">
+<RESPONSE
+    STATUS="0x0000"
+    MESSAGE='No error'
+     />
+<GET_EMBEDDED_HEALTH_DATA>
+<FANS>
+   <FAN>
+      <LABEL VALUE = "Fan 1"/>
+      <ZONE VALUE = "System"/>
+      <STATUS VALUE = "Ok"/>
+      <SPEED VALUE = "13" UNIT="Percentage"/>
+   </FAN>
+   <FAN>
+      <LABEL VALUE = "Fan 2"/>
+      <ZONE VALUE = "System"/>
+      <STATUS VALUE = "Ok"/>
+      <SPEED VALUE = "13" UNIT="Percentage"/>
+   </FAN>
+   <FAN>
+      <LABEL VALUE = "Fan 3"/>
+      <ZONE VALUE = "System"/>
+      <STATUS VALUE = "Ok"/>
+      <SPEED VALUE = "29" UNIT="Percentage"/>
+   </FAN>
+   <FAN>
+      <LABEL VALUE = "Fan 4"/>
+      <ZONE VALUE = "System"/>
+      <STATUS VALUE = "Ok"/>
+      <SPEED VALUE = "39" UNIT="Percentage"/>
+   </FAN>
+   <FAN>
+      <LABEL VALUE = "Fan 5"/>
+      <ZONE VALUE = "System"/>
+      <STATUS VALUE = "Ok"/>
+      <SPEED VALUE = "43" UNIT="Percentage"/>
+   </FAN>
+   <FAN>
+      <LABEL VALUE = "Fan 6"/>
+      <ZONE VALUE = "System"/>
+      <STATUS VALUE = "Ok"/>
+      <SPEED VALUE = "43" UNIT="Percentage"/>
+   </FAN>
+</FANS>
+<TEMPERATURE>
+   <TEMP>
+      <LABEL VALUE = "Temp 1"/>
+      <LOCATION VALUE = "Ambient"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "24" UNIT="Celsius"/>
+      <CAUTION VALUE = "41" UNIT="Celsius"/>
+      <CRITICAL VALUE = "45" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 2"/>
+      <LOCATION VALUE = "CPU 1"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "40" UNIT="Celsius"/>
+      <CAUTION VALUE = "82" UNIT="Celsius"/>
+      <CRITICAL VALUE = "83" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 3"/>
+      <LOCATION VALUE = "CPU 2"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "40" UNIT="Celsius"/>
+      <CAUTION VALUE = "82" UNIT="Celsius"/>
+      <CRITICAL VALUE = "83" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 4"/>
+      <LOCATION VALUE = "Memory"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "30" UNIT="Celsius"/>
+      <CAUTION VALUE = "87" UNIT="Celsius"/>
+      <CRITICAL VALUE = "92" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 5"/>
+      <LOCATION VALUE = "Memory"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "30" UNIT="Celsius"/>
+      <CAUTION VALUE = "87" UNIT="Celsius"/>
+      <CRITICAL VALUE = "92" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 6"/>
+      <LOCATION VALUE = "Memory"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "34" UNIT="Celsius"/>
+      <CAUTION VALUE = "87" UNIT="Celsius"/>
+      <CRITICAL VALUE = "92" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 7"/>
+      <LOCATION VALUE = "Memory"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "35" UNIT="Celsius"/>
+      <CAUTION VALUE = "87" UNIT="Celsius"/>
+      <CRITICAL VALUE = "92" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 8"/>
+      <LOCATION VALUE = "Power Supply"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "37" UNIT="Celsius"/>
+      <CAUTION VALUE = "90" UNIT="Celsius"/>
+      <CRITICAL VALUE = "95" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 9"/>
+      <LOCATION VALUE = "Power Supply"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "35" UNIT="Celsius"/>
+      <CAUTION VALUE = "65" UNIT="Celsius"/>
+      <CRITICAL VALUE = "70" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 10"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "39" UNIT="Celsius"/>
+      <CAUTION VALUE = "90" UNIT="Celsius"/>
+      <CRITICAL VALUE = "95" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 11"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "32" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 12"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "38" UNIT="Celsius"/>
+      <CAUTION VALUE = "90" UNIT="Celsius"/>
+      <CRITICAL VALUE = "95" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 13"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "n/a"/>
+      <CURRENTREADING VALUE = "n/a" UNIT="n/a"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 14"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "n/a"/>
+      <CURRENTREADING VALUE = "n/a" UNIT="n/a"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 15"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "n/a"/>
+      <CURRENTREADING VALUE = "n/a" UNIT="n/a"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 16"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "28" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 17"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "29" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 18"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "29" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 19"/>
+      <LOCATION VALUE = "CPU"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "27" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 20"/>
+      <LOCATION VALUE = "CPU"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "33" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 21"/>
+      <LOCATION VALUE = "CPU"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "30" UNIT="Celsius"/>
+      <CAUTION VALUE = "80" UNIT="Celsius"/>
+      <CRITICAL VALUE = "85" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 22"/>
+      <LOCATION VALUE = "CPU"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "30" UNIT="Celsius"/>
+      <CAUTION VALUE = "80" UNIT="Celsius"/>
+      <CRITICAL VALUE = "85" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 23"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "35" UNIT="Celsius"/>
+      <CAUTION VALUE = "77" UNIT="Celsius"/>
+      <CRITICAL VALUE = "82" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 24"/>
+      <LOCATION VALUE = "Memory"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "30" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 25"/>
+      <LOCATION VALUE = "Memory"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "32" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 26"/>
+      <LOCATION VALUE = "Memory"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "33" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 27"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "n/a"/>
+      <CURRENTREADING VALUE = "n/a" UNIT="n/a"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 28"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "29" UNIT="Celsius"/>
+      <CAUTION VALUE = "70" UNIT="Celsius"/>
+      <CRITICAL VALUE = "75" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 29"/>
+      <LOCATION VALUE = "System"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "35" UNIT="Celsius"/>
+      <CAUTION VALUE = "60" UNIT="Celsius"/>
+      <CRITICAL VALUE = "65" UNIT="Celsius"/>
+   </TEMP>
+   <TEMP>
+      <LABEL VALUE = "Temp 30"/>
+      <LOCATION VALUE = "I/O Board"/>
+      <STATUS VALUE = "Ok"/>
+      <CURRENTREADING VALUE = "54" UNIT="Celsius"/>
+      <CAUTION VALUE = "110" UNIT="Celsius"/>
+      <CRITICAL VALUE = "115" UNIT="Celsius"/>
+   </TEMP>
+</TEMPERATURE>
+<VRM>
+</VRM>
+<POWER_SUPPLIES>
+   <SUPPLY>
+      <LABEL VALUE = "Power Supply 1"/>
+      <STATUS VALUE = "Ok"/>
+   </SUPPLY>
+   <SUPPLY>
+      <LABEL VALUE = "Power Supply 2"/>
+      <STATUS VALUE = "Ok"/>
+   </SUPPLY>
+</POWER_SUPPLIES>
+<DRIVES>
+   <BACKPLANE>
+      <FIRMWARE VERSION="1.16"/>
+      <ENCLOSURE ADDR="224"/>
+    <DRIVE BAY="1"/>
+      <PRODUCT ID="H106030SDSUN300"/>
+      <DRIVE_STATUS VALUE="Ok"/>
+      <UID LED="Off"/>
+    <DRIVE BAY="2"/>
+      <PRODUCT ID="H106030SDSUN300"/>
+      <DRIVE_STATUS VALUE="Ok"/>
+      <UID LED="Off"/>
+    <DRIVE BAY="3"/>
+      <PRODUCT ID="N/A"/>
+      <DRIVE_STATUS VALUE="Not Installed"/>
+      <UID LED="Off"/>
+    <DRIVE BAY="4"/>
+      <PRODUCT ID="N/A"/>
+      <DRIVE_STATUS VALUE="Not Installed"/>
+      <UID LED="Off"/>
+   </BACKPLANE>
+   <BACKPLANE>
+      <FIRMWARE VERSION="1.16"/>
+      <ENCLOSURE ADDR="226"/>
+    <DRIVE BAY="5"/>
+      <PRODUCT ID="N/A"/>
+      <DRIVE_STATUS VALUE="Not Installed"/>
+      <UID LED="Off"/>
+    <DRIVE BAY="6"/>
+      <PRODUCT ID="N/A"/>
+      <DRIVE_STATUS VALUE="Not Installed"/>
+      <UID LED="Off"/>
+    <DRIVE BAY="7"/>
+      <PRODUCT ID="ST4000LM024-2AN"/>
+      <DRIVE_STATUS VALUE="Ok"/>
+      <UID LED="Off"/>
+    <DRIVE BAY="8"/>
+      <PRODUCT ID="ST4000LM024-2AN"/>
+      <DRIVE_STATUS VALUE="Ok"/>
+      <UID LED="Off"/>
+   </BACKPLANE>
+</DRIVES>
+<HEALTH_AT_A_GLANCE>
+   <FANS STATUS= "Ok"/>
+   <FANS REDUNDANCY= "Fully Redundant"/>
+   <TEMPERATURE STATUS= "Ok"/>
+   <VRM STATUS= "Ok"/>
+   <POWER_SUPPLIES STATUS= "Ok"/>
+   <POWER_SUPPLIES REDUNDANCY= "Fully Redundant"/>
+   <DRIVE STATUS= "Ok"/>
+</HEALTH_AT_A_GLANCE>
+</GET_EMBEDDED_HEALTH_DATA>
+</RIBCL>
+<?xml version="1.0"?>
+<RIBCL VERSION="2.22">
+<RESPONSE
+    STATUS="0x0000"
+    MESSAGE='No error'
+     />
+</RIBCL>
+<?xml version="1.0"?>
+<RIBCL VERSION="2.22">
+<RESPONSE
+    STATUS="0x0000"
+    MESSAGE='No error'
+     />
+</RIBCL>
+<?xml version="1.0"?>
+<RIBCL VERSION="2.22">
+<RESPONSE
+    STATUS="0x0000"
+    MESSAGE='No error'
+     />
+</RIBCL>

@@ -32,7 +32,8 @@ bytecode** via small Java oracles (reflection / recording subclasses).
 | `ui/sdl_main.cpp` | the standalone console window (SDL3 + Dear ImGui) | live iLO 2 |
 | `ui/power_control.hpp` | RIBCL worker behind the panel's power buttons | live iLO 2 |
 | `ui/connections.hpp` | recent host/user list (never the password) | `test_connections` |
-| `ilo/ribcl.hpp` | RIBCL over raw TLS: power status/on/off/reset, UID | live iLO 2 (fw 2.22) |
+| `ilo/ribcl.hpp` | RIBCL over raw TLS: power status/on/off/reset, UID, health | live iLO 2 (fw 2.22) |
+| `ilo/health.hpp` | GET_EMBEDDED_HEALTH / GET_POWER_READINGS parser | `testdata/*.xml` captured from the iLO |
 | `tools/ilo_power.cpp` | RIBCL from the command line (replaces `ilo_power.py`) | live iLO 2 |
 | `tools/console_probe.cpp` | drives the seam like a front end would | live iLO 2 |
 | `ilo/telnet.hpp` | transport: socket, login, DVC trigger, decrypt | real `telnet.run()` |

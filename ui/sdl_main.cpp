@@ -493,6 +493,89 @@ int main(int argc, char** argv) {
             } else if (ps.error) {
                 ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", ps.last_result.c_str());
             }
+
+            // --- health (GET_EMBEDDED_HEALTH / GET_POWER_READINGS) ---------
+            // A one-line summary always; the sensor tables fold away so the
+            // panel stays short unless something is worth looking at.
+            const ImVec4 ok_col  (0.6f, 0.9f, 0.6f, 1.0f);
+            const ImVec4 warn_col(1.0f, 0.8f, 0.3f, 1.0f);
+            const ImVec4 bad_col (1.0f, 0.4f, 0.4f, 1.0f);
+            auto status_col = [&](const std::string& s) -> ImVec4 {
+                if (s.empty() || s == "Ok" || s == "n/a" || s == "Not Installed") return ImGui::GetStyle().Colors[ImGuiCol_Text];
+                return bad_col;
+            };
+            if (ps.watts.valid || ps.health.valid) {
+                ImGui::Spacing();
+                ImGui::SeparatorText("Health");
+            }
+            if (ps.watts.valid) {
+                ImGui::Text("power : %d W", ps.watts.present);
+                ImGui::SameLine();
+                ImGui::TextDisabled("(avg %d, max %d)", ps.watts.average, ps.watts.maximum);
+            }
+            if (ps.health.valid) {
+                const HealthData& h = ps.health;
+                const HealthGlance& g = h.glance;
+                const bool all_ok = health_all_ok(g);
+                ImGui::Text("health: ");
+                ImGui::SameLine();
+                if (all_ok) {
+                    ImGui::TextColored(ok_col, "all Ok");
+                } else {
+                    // Name the subsystems that are not, since that is the
+                    // only time anyone reads this line.
+                    ImGui::TextColored(bad_col, "fans %s, temps %s, vrm %s, psu %s, drives %s",
+                                       g.fans.c_str(), g.temperature.c_str(), g.vrm.c_str(),
+                                       g.supplies.c_str(), g.drives.c_str());
+                }
+
+                const HealthTemp* hot = hottest(h);
+                char hdr[96];
+                if (hot) std::snprintf(hdr, sizeof(hdr), "Temperatures  (%s %d C)###temps", hot->location.c_str(), hot->reading);
+                else     std::snprintf(hdr, sizeof(hdr), "Temperatures###temps");
+                if (ImGui::CollapsingHeader(hdr)) {
+                    if (ImGui::BeginTable("temps", 3, ImGuiTableFlags_SizingFixedFit)) {
+                        for (const auto& t : h.temps) {
+                            if (t.reading < 0) continue;      // not fitted
+                            ImVec4 col = ImGui::GetStyle().Colors[ImGuiCol_Text];
+                            if (t.critical >= 0 && t.reading >= t.critical)     col = bad_col;
+                            else if (t.caution >= 0 && t.reading >= t.caution)  col = warn_col;
+                            ImGui::TableNextRow();
+                            ImGui::TableNextColumn(); ImGui::TextUnformatted(t.location.c_str());
+                            ImGui::TableNextColumn(); ImGui::TextColored(col, "%3d C", t.reading);
+                            ImGui::TableNextColumn(); ImGui::TextDisabled("/ %d", t.caution);
+                        }
+                        ImGui::EndTable();
+                    }
+                }
+                if (ImGui::CollapsingHeader("Fans###fans")) {
+                    if (ImGui::BeginTable("fans", 3, ImGuiTableFlags_SizingFixedFit)) {
+                        for (const auto& f : h.fans) {
+                            ImGui::TableNextRow();
+                            ImGui::TableNextColumn(); ImGui::TextUnformatted(f.label.c_str());
+                            ImGui::TableNextColumn(); ImGui::Text("%3d%%", f.speed_pct);
+                            ImGui::TableNextColumn(); ImGui::TextColored(status_col(f.status), "%s", f.status.c_str());
+                        }
+                        ImGui::EndTable();
+                    }
+                }
+                if (ImGui::CollapsingHeader("Power supplies & drives###psu")) {
+                    for (const auto& s : h.supplies) {
+                        ImGui::TextUnformatted(s.label.c_str());
+                        ImGui::SameLine();
+                        ImGui::TextColored(status_col(s.status), "%s", s.status.c_str());
+                    }
+                    if (ImGui::BeginTable("drives", 3, ImGuiTableFlags_SizingFixedFit)) {
+                        for (const auto& d : h.drives) {
+                            ImGui::TableNextRow();
+                            ImGui::TableNextColumn(); ImGui::Text("bay %d", d.bay);
+                            ImGui::TableNextColumn(); ImGui::TextDisabled("%s", d.product.c_str());
+                            ImGui::TableNextColumn(); ImGui::TextColored(status_col(d.status), "%s", d.status.c_str());
+                        }
+                        ImGui::EndTable();
+                    }
+                }
+            }
         }
 
         // --- status (bottom) --------------------------------------------------
