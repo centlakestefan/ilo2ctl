@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("iLO 2 Remote Console", 1060, 860,
+    SDL_Window* window = SDL_CreateWindow("iLO 2 Remote Console", 1360, 830,
                                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
@@ -369,16 +369,11 @@ int main(int argc, char** argv) {
 
         const bool connected = (core.state() == ConsoleState::Connected);
 
-        // One ImGui window fills the SDL window: a tab bar across the top,
-        // a status line along the bottom. The console image is drawn inside
-        // the Console tab, so the tabs are the whole interface.
-        ImGui::SetNextWindowPos(ImVec2(0, 0));
-        ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-        ImGui::Begin("##main", nullptr,
-                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
-                     ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar |
-                     ImGuiWindowFlags_NoBackground);   // the console texture shows through
+        // Two ImGui windows: a fixed side column on the left (connection,
+        // recent servers, session controls, status), and a background-less
+        // window over the rest holding the Console / Power / Health tabs.
+        // The console texture is drawn by SDL underneath the right window.
+        constexpr float kSideWidth = 300.0f;
 
         // Once the console is up, the credentials are known to be good: record
         // host and user (never the password) for next time.
@@ -392,12 +387,118 @@ int main(int argc, char** argv) {
         const ImVec4 warn_col(1.0f, 0.8f, 0.3f, 1.0f);
         const ImVec4 bad_col (1.0f, 0.4f, 0.4f, 1.0f);
 
-        // Tabs in a child sized to leave one text line for the status bar, so
-        // a long sensor list scrolls inside its tab rather than pushing the
-        // status off the bottom.
-        const float status_h = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
-        ImGui::BeginChild("tabs", ImVec2(0, std::max(ImGui::GetContentRegionAvail().y - status_h, 50.0f)),
-                          ImGuiChildFlags_None);
+        // --- left column ------------------------------------------------------
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(kSideWidth, ImGui::GetIO().DisplaySize.y));
+        ImGui::Begin("##side", nullptr,
+                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                     ImGuiWindowFlags_NoBringToFrontOnFocus);
+        {
+            const bool idle = core.state() == ConsoleState::Idle ||
+                              core.state() == ConsoleState::Failed ||
+                              core.state() == ConsoleState::Stopped;
+            if (idle) {
+                // Enter in any field connects, as in every login dialog.
+                const ImGuiInputTextFlags enter = ImGuiInputTextFlags_EnterReturnsTrue;
+                bool go = false;
+                go |= ImGui::InputText("host", host_buf, sizeof(host_buf), enter);
+                go |= ImGui::InputText("user", user_buf, sizeof(user_buf), enter);
+                go |= ImGui::InputText("password", pass_buf, sizeof(pass_buf),
+                                       enter | ImGuiInputTextFlags_Password);
+                go |= ImGui::Button("Connect");
+                if (go) do_connect();
+
+                if (!recent.empty()) {
+                    ImGui::Spacing();
+                    ImGui::TextDisabled("recent");
+                    size_t forget = recent.size();
+                    for (size_t i = 0; i < recent.size(); ++i) {
+                        const std::string label = recent[i].user.empty()
+                            ? recent[i].host
+                            : recent[i].user + "@" + recent[i].host;
+                        ImGui::PushID(int(i));
+                        // Click fills the fields; double-click connects; the
+                        // small button on the right forgets the entry.
+                        if (ImGui::Selectable(label.c_str(), false,
+                                              ImGuiSelectableFlags_AllowDoubleClick,
+                                              ImVec2(ImGui::GetContentRegionAvail().x - 24, 0))) {
+                            std::snprintf(host_buf, sizeof(host_buf), "%s", recent[i].host.c_str());
+                            std::snprintf(user_buf, sizeof(user_buf), "%s", recent[i].user.c_str());
+                            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) do_connect();
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("x")) forget = i;
+                        ImGui::PopID();
+                    }
+                    if (forget < recent.size()) {
+                        forget_connection(recent, forget);
+                        if (!connections_path.empty()) save_connections(connections_path, recent);
+                    }
+                }
+            } else {
+                if (ImGui::Button("Disconnect")) do_disconnect();
+                ImGui::SameLine();
+                if (ImGui::Button("Refresh")) core.request_refresh();
+                ImGui::SameLine();
+                // The real key combination never reaches an application on
+                // either platform, so it has to be a button.
+                if (ImGui::Button("Ctrl-Alt-Del")) core.send_ctrl_alt_del();
+                ImGui::Checkbox("forward keyboard and mouse", &send_input);
+            }
+
+            // Errors belong next to the controls that caused them.
+            if (!ui_error.empty()) {
+                ImGui::PushStyleColor(ImGuiCol_Text, bad_col);
+                ImGui::TextWrapped("%s", ui_error.c_str());
+                ImGui::PopStyleColor();
+            }
+            const std::string core_err = core.error();
+            if (!core_err.empty()) {
+                ImGui::PushStyleColor(ImGuiCol_Text, bad_col);
+                ImGui::TextWrapped("%s", core_err.c_str());
+                ImGui::PopStyleColor();
+            }
+
+            // Status, pinned to the bottom of the column. Its height is
+            // measured as it is drawn and used to place it next frame.
+            static float status_height = 0.0f;
+            {
+                const float bottom = ImGui::GetWindowHeight() - ImGui::GetStyle().WindowPadding.y;
+                const float y = bottom - status_height;
+                if (y > ImGui::GetCursorPosY()) ImGui::SetCursorPosY(y);
+                const float start = ImGui::GetCursorPosY();
+
+                ImGui::PushTextWrapPos(0.0f);
+                ImGui::Separator();
+                ImGui::Text("state   : %s", console_state_name(core.state()));
+                const std::string status = core.status();
+                if (!status.empty()) ImGui::Text("status  : %s", status.c_str());
+                if (fb_w) ImGui::Text("screen  : %dx%d", fb_w, fb_h);
+                const unsigned long long p = core.pastes(), c = core.changed_pastes();
+                if (p) {
+                    ImGui::Text("tiles   : %llu received, %llu changed (%.1f%% redundant)",
+                                p, c, 100.0 * double(p - c) / double(p));
+                }
+                ImGui::Text("uploads : %llu over %llu changed frames", uploads, frames);
+                ImGui::Text("%.1f FPS", double(ImGui::GetIO().Framerate));
+                ImGui::PopTextWrapPos();
+
+                status_height = ImGui::GetCursorPosY() - start;
+            }
+        }
+        ImGui::End();
+
+        // --- right side: the tabs ---------------------------------------------
+        ImGui::SetNextWindowPos(ImVec2(kSideWidth, 0));
+        ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x - kSideWidth,
+                                        ImGui::GetIO().DisplaySize.y));
+        ImGui::Begin("##tabs", nullptr,
+                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                     ImGuiWindowFlags_NoBringToFrontOnFocus |
+                     ImGuiWindowFlags_NoBackground);   // the console texture shows through
+
         image_hovered = false;
         console_tab_active = false;
         if (ImGui::BeginTabBar("panel")) {
@@ -409,85 +510,13 @@ int main(int argc, char** argv) {
                                                         : ImGuiTabItemFlags_None;
             };
 
-            // --- Console ---------------------------------------------------
+            // --- Console: the image, nothing else --------------------------
             if (ImGui::BeginTabItem("Console", nullptr, tab_flags("console"))) {
-                const bool idle = core.state() == ConsoleState::Idle ||
-                                  core.state() == ConsoleState::Failed ||
-                                  core.state() == ConsoleState::Stopped;
-                if (idle) {
-                    // Enter in any field connects, as in every login dialog.
-                    const ImGuiInputTextFlags enter = ImGuiInputTextFlags_EnterReturnsTrue;
-                    bool go = false;
-                    go |= ImGui::InputText("host", host_buf, sizeof(host_buf), enter);
-                    go |= ImGui::InputText("user", user_buf, sizeof(user_buf), enter);
-                    go |= ImGui::InputText("password", pass_buf, sizeof(pass_buf),
-                                           enter | ImGuiInputTextFlags_Password);
-                    go |= ImGui::Button("Connect");
-                    if (go) do_connect();
-
-                    if (!recent.empty()) {
-                        ImGui::Spacing();
-                        ImGui::TextDisabled("recent");
-                        size_t forget = recent.size();
-                        for (size_t i = 0; i < recent.size(); ++i) {
-                            const std::string label = recent[i].user.empty()
-                                ? recent[i].host
-                                : recent[i].user + "@" + recent[i].host;
-                            ImGui::PushID(int(i));
-                            // Click fills the fields; double-click connects; the
-                            // small button on the right forgets the entry.
-                            if (ImGui::Selectable(label.c_str(), false,
-                                                  ImGuiSelectableFlags_AllowDoubleClick,
-                                                  ImVec2(ImGui::GetContentRegionAvail().x - 24, 0))) {
-                                std::snprintf(host_buf, sizeof(host_buf), "%s", recent[i].host.c_str());
-                                std::snprintf(user_buf, sizeof(user_buf), "%s", recent[i].user.c_str());
-                                if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) do_connect();
-                            }
-                            ImGui::SameLine();
-                            if (ImGui::SmallButton("x")) forget = i;
-                            ImGui::PopID();
-                        }
-                        if (forget < recent.size()) {
-                            forget_connection(recent, forget);
-                            if (!connections_path.empty()) save_connections(connections_path, recent);
-                        }
-                    }
-                } else {
-                    // One toolbar row, then the console fills the rest.
-                    if (ImGui::Button("Disconnect")) do_disconnect();
-                    ImGui::SameLine();
-                    if (ImGui::Button("Refresh")) core.request_refresh();
-                    ImGui::SameLine();
-                    // The real key combination never reaches an application on
-                    // either platform, so it has to be a button.
-                    if (ImGui::Button("Ctrl-Alt-Del")) core.send_ctrl_alt_del();
-                    ImGui::SameLine();
-                    ImGui::Checkbox("forward keyboard and mouse", &send_input);
-                    if (!core.status().empty()) {
-                        ImGui::SameLine();
-                        ImGui::TextDisabled("%s", core.status().c_str());
-                    }
-                }
-
-                // Errors belong next to the controls that caused them.
-                if (!ui_error.empty()) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, bad_col);
-                    ImGui::TextWrapped("%s", ui_error.c_str());
-                    ImGui::PopStyleColor();
-                }
-                const std::string core_err = core.error();
-                if (!core_err.empty()) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, bad_col);
-                    ImGui::TextWrapped("%s", core_err.c_str());
-                    ImGui::PopStyleColor();
-                }
-
-                // The console image, letterboxed into whatever is left of the
-                // tab. ImGui only lays out and hit-tests a placeholder here;
-                // the texture itself is drawn by SDL_RenderTexture underneath
-                // the (background-less) ImGui window, because the SDL_Renderer
-                // backend's geometry path does not draw a streaming texture on
-                // every renderer (the software one, for a start) while
+                // ImGui only lays out and hit-tests a placeholder; the texture
+                // itself is drawn by SDL_RenderTexture underneath this
+                // background-less window, because the SDL_Renderer backend's
+                // geometry path does not draw a streaming texture on every
+                // renderer (the software one, for a start) while
                 // SDL_RenderTexture does. Same units as SDL's mouse events.
                 console_tab_active = true;
                 if (tex) {
@@ -502,6 +531,7 @@ int main(int argc, char** argv) {
                     }
                 } else {
                     image_rect = SDL_FRect{ 0, 0, 0, 0 };
+                    ImGui::TextDisabled(connected ? "waiting for video..." : "not connected");
                 }
                 ImGui::EndTabItem();
             }
@@ -670,25 +700,6 @@ int main(int argc, char** argv) {
             }
             ImGui::EndTabBar();
             first_frame = false;
-        }
-        ImGui::EndChild();
-
-        // --- status bar (one line, bottom) ------------------------------------
-        {
-            ImGui::Separator();
-            ImGui::TextDisabled("%s", console_state_name(core.state()));
-            const std::string status = core.status();
-            if (!status.empty()) { ImGui::SameLine(); ImGui::TextDisabled("| %s", status.c_str()); }
-            if (fb_w)            { ImGui::SameLine(); ImGui::TextDisabled("| %dx%d", fb_w, fb_h); }
-            const unsigned long long p = core.pastes(), c = core.changed_pastes();
-            if (p) {
-                ImGui::SameLine();
-                ImGui::TextDisabled("| tiles %llu, %llu changed (%.1f%% redundant)",
-                                    p, c, 100.0 * double(p - c) / double(p));
-            }
-            ImGui::SameLine();
-            ImGui::TextDisabled("| uploads %llu / %llu frames | %.0f FPS",
-                                uploads, frames, double(ImGui::GetIO().Framerate));
         }
         ImGui::End();
 
