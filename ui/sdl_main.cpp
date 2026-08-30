@@ -57,24 +57,16 @@ struct Options {
     std::string tab = "console";
 };
 
-// The control panel is a fixed strip down the left edge; the console gets
-// everything to its right, so the two never overlap. This is in ImGui's
-// window units; the render target is in pixels, so callers scale it by the
-// window's pixel density before handing it to letterbox().
-constexpr float kPanelWidth = 300.0f;
-
-// Where the console image lands inside the window, preserving aspect ratio,
-// within the area to the right of the panel (panel_px wide, in pixels).
-SDL_FRect letterbox(int fb_w, int fb_h, int win_w, int win_h, float panel_px) {
-    if (fb_w <= 0 || fb_h <= 0) return SDL_FRect{ 0, 0, 0, 0 };
-    const float area_x = panel_px;
-    const float area_w = std::max(0.0f, float(win_w) - area_x);
-    const float sx = area_w / float(fb_w);
-    const float sy = float(win_h) / float(fb_h);
-    const float s  = std::min(sx, sy);
-    const float w  = float(fb_w) * s;
-    const float h  = float(fb_h) * s;
-    return SDL_FRect{ area_x + (area_w - w) * 0.5f, (float(win_h) - h) * 0.5f, w, h };
+// Where the console image lands inside an area, preserving aspect ratio and
+// centred. Everything is in window units: the area comes from ImGui's content
+// region and the result is handed back to ImGui and compared against SDL
+// mouse coordinates, which use the same units.
+SDL_FRect letterbox(int fb_w, int fb_h, const SDL_FRect& area) {
+    if (fb_w <= 0 || fb_h <= 0 || area.w <= 0 || area.h <= 0) return SDL_FRect{ 0, 0, 0, 0 };
+    const float s = std::min(area.w / float(fb_w), area.h / float(fb_h));
+    const float w = float(fb_w) * s;
+    const float h = float(fb_h) * s;
+    return SDL_FRect{ area.x + (area.w - w) * 0.5f, area.y + (area.h - h) * 0.5f, w, h };
 }
 
 // Window coordinates -> console pixel coordinates. Returns false when the
@@ -173,7 +165,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("iLO 2 Remote Console", 1344, 800,
+    SDL_Window* window = SDL_CreateWindow("iLO 2 Remote Console", 1060, 860,
                                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
@@ -215,6 +207,12 @@ int main(int argc, char** argv) {
     int rendered = 0;
     int connected_frames = 0;
     bool wake_sent = false;
+    // Where the console image was drawn last frame, whether the pointer was
+    // over it, and whether the Console tab was showing -- the event loop
+    // needs all three and runs before this frame's layout exists.
+    SDL_FRect image_rect{ 0, 0, 0, 0 };
+    bool image_hovered = false;
+    bool console_tab_active = true;
 
     // Recent connections: host and user only, never the password. Stored in
     // the per-user preferences directory SDL picks for this platform.
@@ -287,14 +285,16 @@ int main(int argc, char** argv) {
 
             if (!send_input || core.state() != ConsoleState::Connected) continue;
 
-            int win_w = 0, win_h = 0;
-            SDL_GetRenderOutputSize(renderer, &win_w, &win_h);
-            const SDL_FRect dst = letterbox(fb_w, fb_h, win_w, win_h,
-                                            kPanelWidth * SDL_GetWindowPixelDensity(window));
+            // The console image is an ImGui item now, so ImGui's own capture
+            // flags cannot gate forwarding: the whole window is ImGui, and the
+            // image itself "captures" the mouse. Instead: mouse goes to the
+            // server while the pointer is over the image (as ImGui reported it
+            // last frame), keys go to the server unless a text field has focus.
+            const SDL_FRect dst = image_rect;
 
             switch (ev.type) {
                 case SDL_EVENT_MOUSE_MOTION: {
-                    if (io.WantCaptureMouse) break;
+                    if (!image_hovered) break;
                     int cx = 0, cy = 0;
                     if (to_console(dst, fb_w, fb_h, ev.motion.x, ev.motion.y, cx, cy))
                         core.mouse_move(cx, cy);
@@ -302,7 +302,7 @@ int main(int argc, char** argv) {
                 }
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
                 case SDL_EVENT_MOUSE_BUTTON_UP: {
-                    if (io.WantCaptureMouse) break;
+                    if (!image_hovered) break;
                     const int b = sdl_button_to_ilo(ev.button.button);
                     if (!b) break;
                     int cx = 0, cy = 0;
@@ -313,12 +313,12 @@ int main(int argc, char** argv) {
                     break;
                 }
                 case SDL_EVENT_TEXT_INPUT: {
-                    if (io.WantCaptureKeyboard) break;
+                    if (io.WantTextInput || !console_tab_active) break;
                     for (const char* p = ev.text.text; *p; ++p) core.type_char(*p);
                     break;
                 }
                 case SDL_EVENT_KEY_DOWN: {
-                    if (io.WantCaptureKeyboard) break;
+                    if (io.WantTextInput || !console_tab_active) break;
                     std::string bytes;
                     if (special_key_bytes(ev.key.key, bytes)) core.send_raw(bytes);
                     break;
@@ -369,11 +369,16 @@ int main(int argc, char** argv) {
 
         const bool connected = (core.state() == ConsoleState::Connected);
 
+        // One ImGui window fills the SDL window: a tab bar across the top,
+        // a status line along the bottom. The console image is drawn inside
+        // the Console tab, so the tabs are the whole interface.
         ImGui::SetNextWindowPos(ImVec2(0, 0));
-        ImGui::SetNextWindowSize(ImVec2(kPanelWidth, ImGui::GetIO().DisplaySize.y));
-        ImGui::Begin("Console", nullptr,
-                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
+        ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+        ImGui::Begin("##main", nullptr,
+                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                     ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar |
+                     ImGuiWindowFlags_NoBackground);   // the console texture shows through
 
         // Once the console is up, the credentials are known to be good: record
         // host and user (never the password) for next time.
@@ -387,14 +392,14 @@ int main(int argc, char** argv) {
         const ImVec4 warn_col(1.0f, 0.8f, 0.3f, 1.0f);
         const ImVec4 bad_col (1.0f, 0.4f, 0.4f, 1.0f);
 
-        // The panel is three tabs over a status block pinned to the bottom.
-        // The tab content lives in a child sized to leave the status its room,
-        // so a long sensor list scrolls instead of pushing the status off.
-        // The status height is measured as it is drawn and used next frame.
-        static float status_height = 0.0f;
-        const float tabs_height = ImGui::GetContentRegionAvail().y - status_height -
-                                  ImGui::GetStyle().ItemSpacing.y;
-        ImGui::BeginChild("tabs", ImVec2(0, std::max(tabs_height, 50.0f)), ImGuiChildFlags_None);
+        // Tabs in a child sized to leave one text line for the status bar, so
+        // a long sensor list scrolls inside its tab rather than pushing the
+        // status off the bottom.
+        const float status_h = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
+        ImGui::BeginChild("tabs", ImVec2(0, std::max(ImGui::GetContentRegionAvail().y - status_h, 50.0f)),
+                          ImGuiChildFlags_None);
+        image_hovered = false;
+        console_tab_active = false;
         if (ImGui::BeginTabBar("panel")) {
             // --tab picks the initial tab; only the first frame asks for it,
             // after which the user's clicks own the selection.
@@ -448,6 +453,7 @@ int main(int argc, char** argv) {
                         }
                     }
                 } else {
+                    // One toolbar row, then the console fills the rest.
                     if (ImGui::Button("Disconnect")) do_disconnect();
                     ImGui::SameLine();
                     if (ImGui::Button("Refresh")) core.request_refresh();
@@ -455,7 +461,12 @@ int main(int argc, char** argv) {
                     // The real key combination never reaches an application on
                     // either platform, so it has to be a button.
                     if (ImGui::Button("Ctrl-Alt-Del")) core.send_ctrl_alt_del();
+                    ImGui::SameLine();
                     ImGui::Checkbox("forward keyboard and mouse", &send_input);
+                    if (!core.status().empty()) {
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("%s", core.status().c_str());
+                    }
                 }
 
                 // Errors belong next to the controls that caused them.
@@ -469,6 +480,28 @@ int main(int argc, char** argv) {
                     ImGui::PushStyleColor(ImGuiCol_Text, bad_col);
                     ImGui::TextWrapped("%s", core_err.c_str());
                     ImGui::PopStyleColor();
+                }
+
+                // The console image, letterboxed into whatever is left of the
+                // tab. ImGui only lays out and hit-tests a placeholder here;
+                // the texture itself is drawn by SDL_RenderTexture underneath
+                // the (background-less) ImGui window, because the SDL_Renderer
+                // backend's geometry path does not draw a streaming texture on
+                // every renderer (the software one, for a start) while
+                // SDL_RenderTexture does. Same units as SDL's mouse events.
+                console_tab_active = true;
+                if (tex) {
+                    const ImVec2 pos   = ImGui::GetCursorScreenPos();
+                    const ImVec2 avail = ImGui::GetContentRegionAvail();
+                    const SDL_FRect area{ pos.x, pos.y, avail.x, avail.y };
+                    image_rect = letterbox(fb_w, fb_h, area);
+                    if (image_rect.w > 0) {
+                        ImGui::SetCursorScreenPos(ImVec2(image_rect.x, image_rect.y));
+                        ImGui::Dummy(ImVec2(image_rect.w, image_rect.h));
+                        image_hovered = ImGui::IsItemHovered();
+                    }
+                } else {
+                    image_rect = SDL_FRect{ 0, 0, 0, 0 };
                 }
                 ImGui::EndTabItem();
             }
@@ -640,24 +673,22 @@ int main(int argc, char** argv) {
         }
         ImGui::EndChild();
 
-        // --- status (bottom) --------------------------------------------------
+        // --- status bar (one line, bottom) ------------------------------------
         {
-            const float start = ImGui::GetCursorPosY();
-            ImGui::PushTextWrapPos(0.0f);
             ImGui::Separator();
-            ImGui::Text("state   : %s", console_state_name(core.state()));
+            ImGui::TextDisabled("%s", console_state_name(core.state()));
             const std::string status = core.status();
-            if (!status.empty()) ImGui::Text("status  : %s", status.c_str());
-            if (fb_w) ImGui::Text("screen  : %dx%d", fb_w, fb_h);
+            if (!status.empty()) { ImGui::SameLine(); ImGui::TextDisabled("| %s", status.c_str()); }
+            if (fb_w)            { ImGui::SameLine(); ImGui::TextDisabled("| %dx%d", fb_w, fb_h); }
             const unsigned long long p = core.pastes(), c = core.changed_pastes();
             if (p) {
-                ImGui::Text("tiles   : %llu received, %llu changed (%.1f%% redundant)",
-                            p, c, 100.0 * double(p - c) / double(p));
+                ImGui::SameLine();
+                ImGui::TextDisabled("| tiles %llu, %llu changed (%.1f%% redundant)",
+                                    p, c, 100.0 * double(p - c) / double(p));
             }
-            ImGui::Text("uploads : %llu over %llu changed frames", uploads, frames);
-            ImGui::Text("%.1f FPS", double(ImGui::GetIO().Framerate));
-            ImGui::PopTextWrapPos();
-            status_height = ImGui::GetCursorPosY() - start;
+            ImGui::SameLine();
+            ImGui::TextDisabled("| uploads %llu / %llu frames | %.0f FPS",
+                                uploads, frames, double(ImGui::GetIO().Framerate));
         }
         ImGui::End();
 
@@ -672,13 +703,13 @@ int main(int argc, char** argv) {
         if (!ImGui::GetIO().WantTextInput && !SDL_TextInputActive(window))
             SDL_StartTextInput(window);
 
-        int win_w = 0, win_h = 0;
-        SDL_GetRenderOutputSize(renderer, &win_w, &win_h);
+        // Clear, console texture (where the Console tab laid it out, scaled
+        // from window units to render pixels), then ImGui on top.
         SDL_SetRenderDrawColor(renderer, 16, 16, 20, 255);
         SDL_RenderClear(renderer);
-        if (tex) {
-            const SDL_FRect dst = letterbox(fb_w, fb_h, win_w, win_h,
-                                            kPanelWidth * SDL_GetWindowPixelDensity(window));
+        if (tex && console_tab_active && image_rect.w > 0) {
+            const float d = SDL_GetWindowPixelDensity(window);
+            const SDL_FRect dst{ image_rect.x * d, image_rect.y * d, image_rect.w * d, image_rect.h * d };
             SDL_RenderTexture(renderer, tex, nullptr, &dst);
         }
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
