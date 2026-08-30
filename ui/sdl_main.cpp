@@ -52,15 +52,24 @@ struct Options {
     bool        wake = false;
 };
 
-// Where the console image lands inside the window, preserving aspect ratio.
-SDL_FRect letterbox(int fb_w, int fb_h, int win_w, int win_h) {
+// The control panel is a fixed strip down the left edge; the console gets
+// everything to its right, so the two never overlap. This is in ImGui's
+// window units; the render target is in pixels, so callers scale it by the
+// window's pixel density before handing it to letterbox().
+constexpr float kPanelWidth = 300.0f;
+
+// Where the console image lands inside the window, preserving aspect ratio,
+// within the area to the right of the panel (panel_px wide, in pixels).
+SDL_FRect letterbox(int fb_w, int fb_h, int win_w, int win_h, float panel_px) {
     if (fb_w <= 0 || fb_h <= 0) return SDL_FRect{ 0, 0, 0, 0 };
-    const float sx = float(win_w) / float(fb_w);
+    const float area_x = panel_px;
+    const float area_w = std::max(0.0f, float(win_w) - area_x);
+    const float sx = area_w / float(fb_w);
     const float sy = float(win_h) / float(fb_h);
     const float s  = std::min(sx, sy);
     const float w  = float(fb_w) * s;
     const float h  = float(fb_h) * s;
-    return SDL_FRect{ (float(win_w) - w) * 0.5f, (float(win_h) - h) * 0.5f, w, h };
+    return SDL_FRect{ area_x + (area_w - w) * 0.5f, (float(win_h) - h) * 0.5f, w, h };
 }
 
 // Window coordinates -> console pixel coordinates. Returns false when the
@@ -158,7 +167,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("iLO 2 Remote Console", 1280, 900,
+    SDL_Window* window = SDL_CreateWindow("iLO 2 Remote Console", 1344, 800,
                                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
@@ -235,7 +244,8 @@ int main(int argc, char** argv) {
 
             int win_w = 0, win_h = 0;
             SDL_GetRenderOutputSize(renderer, &win_w, &win_h);
-            const SDL_FRect dst = letterbox(fb_w, fb_h, win_w, win_h);
+            const SDL_FRect dst = letterbox(fb_w, fb_h, win_w, win_h,
+                                            kPanelWidth * SDL_GetWindowPixelDensity(window));
 
             switch (ev.type) {
                 case SDL_EVENT_MOUSE_MOTION: {
@@ -314,9 +324,12 @@ int main(int argc, char** argv) {
 
         const bool connected = (core.state() == ConsoleState::Connected);
 
-        ImGui::SetNextWindowPos(ImVec2(8, 8), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(360, 0), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Console", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(kPanelWidth, ImGui::GetIO().DisplaySize.y));
+        ImGui::Begin("Console", nullptr,
+                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
+        ImGui::PushTextWrapPos(0.0f);
 
         if (!connected) {
             ImGui::InputText("host", host_buf, sizeof(host_buf));
@@ -358,6 +371,7 @@ int main(int argc, char** argv) {
             ImGui::Separator();
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", core_err.c_str());
         }
+        ImGui::PopTextWrapPos();
         ImGui::End();
 
         ImGui::Render();
@@ -376,7 +390,8 @@ int main(int argc, char** argv) {
         SDL_SetRenderDrawColor(renderer, 16, 16, 20, 255);
         SDL_RenderClear(renderer);
         if (tex) {
-            const SDL_FRect dst = letterbox(fb_w, fb_h, win_w, win_h);
+            const SDL_FRect dst = letterbox(fb_w, fb_h, win_w, win_h,
+                                            kPanelWidth * SDL_GetWindowPixelDensity(window));
             SDL_RenderTexture(renderer, tex, nullptr, &dst);
         }
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
