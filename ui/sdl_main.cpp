@@ -362,6 +362,15 @@ int main(int argc, char** argv) {
 
         ImGui::Render();
 
+        // SDL3 delivers SDL_EVENT_TEXT_INPUT only while text input is enabled,
+        // and it is off by default (SDL2 had it on). The ImGui backend turns it
+        // on for its own text fields and off again when they lose focus, so a
+        // single SDL_StartTextInput() at startup would stop working the first
+        // time the connect dialog was used. Re-arm it every frame the console
+        // owns the keyboard instead; when ImGui wants it, it manages it itself.
+        if (!ImGui::GetIO().WantTextInput && !SDL_TextInputActive(window))
+            SDL_StartTextInput(window);
+
         int win_w = 0, win_h = 0;
         SDL_GetRenderOutputSize(renderer, &win_w, &win_h);
         SDL_SetRenderDrawColor(renderer, 16, 16, 20, 255);
