@@ -92,7 +92,11 @@ CFR. `build/` and `console.html` (holds a live session token) are generated.
 
 ## Status
 
-Inbound path (crypto → transport → DVC decoder → PNG) and outbound input
-encoders are ported and validated offline. Remaining work needs live hardware: a
-one-time real DVC capture to confirm the decoded image, and the outbound
-encrypt/session layer + `ilo2_click`/`ilo2_type` tools with a live test.
+Working end to end against a real iLO 2: TLS 1.0 login, session scrape,
+DVC video, keyboard and mouse, plus server control over RIBCL (power, reset,
+UID) and health readout (temperatures, fans, PSUs, drives, wattage). The
+console window has three tabs — Console, Power, Health — over a status block.
+
+Open: the Linux build has not been compiled yet (the code is branched for it);
+`LocaleTranslator` is unported, so non-US layouts only send ASCII; virtual media
+and one-time boot are still the Python scripts.
