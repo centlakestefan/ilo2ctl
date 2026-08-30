@@ -48,6 +48,8 @@ set(SELF_ASSERTING_TESTS
     test_client
     test_ilo_session
     test_console_core
+    test_ribcl
+    test_connections
     test_random
     test_crypto
 )
@@ -83,6 +85,9 @@ target_link_libraries(tls_get PRIVATE ilo2_core)
 
 add_executable(console_probe tools/console_probe.cpp)
 target_link_libraries(console_probe PRIVATE ilo2_core)
+
+add_executable(ilo_power tools/ilo_power.cpp)
+target_link_libraries(ilo_power PRIVATE ilo2_core)
 
 # ---------------------------------------------------------------------------
 # GUI (SDL3 + Dear ImGui)
