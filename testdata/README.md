@@ -137,6 +137,59 @@ device out of the box: `YES` for CDROM, `NO` for FLOPPY.
 All seven are read-only commands. The replies carry no credentials, no session
 tokens and no image URLs.
 
+## `ilo2_vm_http_requests.log`
+
+What the iLO 2's own HTTP client does when it fetches a virtual-media image,
+recorded 2026-09-01 by `tools/media_server.cpp` while firmware 2.29 pulled a
+4.7 GiB Windows Server 2022 ISO. It is documentation, not a test input: nothing
+parses it. It is here because the firmware is from 2005 and none of this is
+guessable.
+
+The first few requests are `curl` self-tests, kept deliberately -- the contrast
+with the firmware's requests below them is the point.
+
+**The Range header is zero-padded to 20 digits:**
+
+```
+Range: bytes=00000000000000561152-00000000000000563199
+```
+
+`strtoull` copes; a parser that assumes a plausible digit count does not. If you
+ever replace the HTTP layer, this is the first thing to test.
+
+Everything else the firmware does, over 38 requests, 41 `206` responses, no
+errors and no dropped connections:
+
+| | |
+|---|---|
+| Method / version | `GET`, `HTTP/1.1`, every time |
+| Headers sent | **only `Host` and `Range`** -- no `User-Agent`, `Accept` or `Connection` |
+| `Host` value | the bare address, **port omitted**, even on `:8080` |
+| Read sizes | 2048 B (34x), 4096 B (3x), 256 B (1x) |
+| Access pattern | seeks, not a stream: 561152, 622592, 2543616, 4814848, 2551808, ... |
+| Multi-range | never asked for one, so `multipart/byteranges` never comes up |
+
+Keep-alive was enabled throughout and nothing broke, so an HTTP/1.1 server with
+default keep-alive is fine. (`range_http_server.py`, the Python script this
+replaced, was accidentally HTTP/1.0 -- it never overrode
+`SimpleHTTPRequestHandler.protocol_version` -- so connection-per-request was
+merely what the firmware happened to get, not what it needs.)
+
+## Driving virtual media over RIBCL
+
+Two things learned the hard way while capturing the log above, both worth
+knowing before writing the RIBCL side:
+
+- **`INSERT_VIRTUAL_MEDIA` fetches nothing.** It records the URL and returns.
+  Afterwards `GET_VM_STATUS` reports `IMAGE_INSERTED="YES"` with the right
+  `IMAGE_URL` and the HTTP server has seen no request at all. What makes the
+  firmware actually connect is
+  `<SET_VM_STATUS DEVICE="CDROM"><VM_BOOT_OPTION VALUE="CONNECT"/></SET_VM_STATUS>`.
+- **`CONNECT` is not boot-neutral.** It silently sets `BOOT_OPTION` to
+  `BOOT_ALWAYS`, so the host boots the image on its next reboot whether or not
+  anyone asked for that. Read `GET_VM_STATUS` back after connecting, and set
+  `NO_BOOT` explicitly if a boot was not intended.
+
 ## `ilo_cert.der` (612 bytes)
 
 The X.509 certificate the iLO 2 serves on port 443, captured with a raw

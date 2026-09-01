@@ -48,6 +48,7 @@ repository, has never been committed to it, and nothing here needs it.
 | `ilo/cim_png.hpp` | framebuffer -> PNG (vendored `stb_image_write`) | Java `ImageIO` |
 | `ilo/ilo2_input.hpp` | outbound mouse/keyboard encoders | real `cim` (transmit capture) |
 | `ilo/ilo2_session.hpp` | outbound session layer (RC4 encrypt, key index) | live iLO 2 |
+| `tools/media_server.cpp` | serves an ISO for virtual media (vendored cpp-httplib) | live iLO 2 (fw 2.29) |
 | `tools/capture_dvc.cpp` | live capture -> `.bin` + PNG | — |
 | `tools/replay_dvc.cpp` | offline replay + decoder stats | `testdata/` fixtures |
 | `tests/oracle/` | frozen recordings of HP's bytecode (the expected values) | — |
@@ -85,6 +86,11 @@ without a window.
 - No Java is required. The oracles that recorded `tests/oracle/` needed JDK 17
   and HP's jar; re-running them is optional and documented in
   `tests/oracle/README.md`.
+- Vendored, no fetch: `third_party/stb_image_write.h` (PNG encode) and
+  `third_party/httplib.h` (cpp-httplib 0.54.1, MIT, for `media_server`). On
+  Windows `media_server` needs `_WIN32_WINNT=0x0A00` and a static
+  libstdc++/libgcc/winpthread — CMake sets both; see the comment there for what
+  breaks without them.
 - stb: exactly one TU defines `STB_IMAGE_WRITE_IMPLEMENTATION` before including
   `third_party/stb_image_write.h`.
 - Reference vectors are generated, not transcribed:
@@ -106,6 +112,14 @@ DVC video, keyboard and mouse, plus server control over RIBCL (power, reset,
 UID) and health readout (temperatures, fans, PSUs, drives, wattage). The
 console window has three tabs — Console, Power, Health — over a status block.
 
+Virtual media is part-ported: `tools/media_server.cpp` serves the image and is
+live-validated — the iLO 2 fetched a 4.7 GiB ISO from it over 38 range requests
+with no errors (`testdata/ilo2_vm_http_requests.log`, which also records the
+firmware's odd 20-digit zero-padded `Range` header). The RIBCL side is not
+written yet: `ribcl_body()` still hardcodes a `SERVER_INFO` wrapper, and virtual
+media lives under `RIB_INFO`.
+
 Open: the Linux build has not been compiled yet (the code is branched for it);
-`LocaleTranslator` is unported, so non-US layouts only send ASCII; virtual media
-and one-time boot are still the Python scripts.
+`LocaleTranslator` is unported, so non-US layouts only send ASCII; the RIBCL
+virtual-media commands and the ISO picker are unwritten, and `mount_and_boot.py`
+is still what performs a mount + one-time boot.

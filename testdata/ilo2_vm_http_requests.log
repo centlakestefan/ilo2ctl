@@ -1,0 +1,223 @@
+serving <local path>/en-us_windows_server_2022_updated_feb_2022_x64_dvd_d4a089c1.iso  (5042972672 bytes, 4.69 GiB)
+cpp-httplib 0.54.1  listening on 0.0.0.0:8080
+REQ   HEAD /win2022.iso HTTP/1.1  from 127.0.0.1
+        Host: 127.0.0.1:8080
+        User-Agent: curl/8.19.0
+        Accept: */*
+RESP  200  Content-Length: 5042972672
+      Range: [0,31]
+REQ   GET /win2022.iso HTTP/1.1  from 127.0.0.1
+        Host: 127.0.0.1:8080
+        Range: bytes=0-31
+        User-Agent: curl/8.19.0
+        Accept: */*
+RESP  206  Content-Range: bytes 0-31/5042972672  Content-Length: 32
+      Range: [5000000000,5000000063]
+REQ   GET /win2022.iso HTTP/1.1  from 127.0.0.1
+        Host: 127.0.0.1:8080
+        Range: bytes=5000000000-5000000063
+        User-Agent: curl/8.19.0
+        Accept: */*
+RESP  206  Content-Range: bytes 5000000000-5000000063/5042972672  Content-Length: 64
+      Range: [0,15]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.23.108
+        Host: 10.10.23.108:8080
+        Range: bytes=0-15
+        User-Agent: curl/8.19.0
+        Accept: */*
+RESP  206  Content-Range: bytes 0-15/5042972672  Content-Length: 16
+      Range: [0,255]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=0-255
+RESP  206  Content-Range: bytes 0-255/5042972672  Content-Length: 256
+      Range: [32768,34815]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000032768-00000000000000034815
+RESP  206  Content-Range: bytes 32768-34815/5042972672  Content-Length: 2048
+      Range: [34816,36863]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000034816-00000000000000036863
+RESP  206  Content-Range: bytes 34816-36863/5042972672  Content-Length: 2048
+      Range: [36864,38911]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000036864-00000000000000038911
+RESP  206  Content-Range: bytes 36864-38911/5042972672  Content-Length: 2048
+      Range: [38912,40959]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000038912-00000000000000040959
+RESP  206  Content-Range: bytes 38912-40959/5042972672  Content-Length: 2048
+      Range: [40960,43007]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000040960-00000000000000043007
+RESP  206  Content-Range: bytes 40960-43007/5042972672  Content-Length: 2048
+      Range: [32768,34815]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000032768-00000000000000034815
+RESP  206  Content-Range: bytes 32768-34815/5042972672  Content-Length: 2048
+      Range: [34816,36863]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000034816-00000000000000036863
+RESP  206  Content-Range: bytes 34816-36863/5042972672  Content-Length: 2048
+      Range: [36864,38911]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000036864-00000000000000038911
+RESP  206  Content-Range: bytes 36864-38911/5042972672  Content-Length: 2048
+      Range: [38912,40959]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000038912-00000000000000040959
+RESP  206  Content-Range: bytes 38912-40959/5042972672  Content-Length: 2048
+      Range: [40960,43007]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000040960-00000000000000043007
+RESP  206  Content-Range: bytes 40960-43007/5042972672  Content-Length: 2048
+      Range: [32768,34815]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000032768-00000000000000034815
+RESP  206  Content-Range: bytes 32768-34815/5042972672  Content-Length: 2048
+      Range: [34816,36863]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000034816-00000000000000036863
+RESP  206  Content-Range: bytes 34816-36863/5042972672  Content-Length: 2048
+      Range: [36864,38911]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000036864-00000000000000038911
+RESP  206  Content-Range: bytes 36864-38911/5042972672  Content-Length: 2048
+      Range: [38912,40959]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000038912-00000000000000040959
+RESP  206  Content-Range: bytes 38912-40959/5042972672  Content-Length: 2048
+      Range: [40960,43007]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000040960-00000000000000043007
+RESP  206  Content-Range: bytes 40960-43007/5042972672  Content-Length: 2048
+      Range: [524288,526335]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000524288-00000000000000526335
+RESP  206  Content-Range: bytes 524288-526335/5042972672  Content-Length: 2048
+      Range: [526336,528383]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000526336-00000000000000528383
+RESP  206  Content-Range: bytes 526336-528383/5042972672  Content-Length: 2048
+      Range: [528384,530431]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000528384-00000000000000530431
+RESP  206  Content-Range: bytes 528384-530431/5042972672  Content-Length: 2048
+      Range: [530432,532479]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000530432-00000000000000532479
+RESP  206  Content-Range: bytes 530432-532479/5042972672  Content-Length: 2048
+      Range: [532480,534527]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000532480-00000000000000534527
+RESP  206  Content-Range: bytes 532480-534527/5042972672  Content-Length: 2048
+      Range: [534528,536575]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000534528-00000000000000536575
+RESP  206  Content-Range: bytes 534528-536575/5042972672  Content-Length: 2048
+      Range: [536576,538623]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000536576-00000000000000538623
+RESP  206  Content-Range: bytes 536576-538623/5042972672  Content-Length: 2048
+      Range: [526336,528383]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000526336-00000000000000528383
+RESP  206  Content-Range: bytes 526336-528383/5042972672  Content-Length: 2048
+      Range: [528384,530431]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000528384-00000000000000530431
+RESP  206  Content-Range: bytes 528384-530431/5042972672  Content-Length: 2048
+      Range: [530432,532479]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000530432-00000000000000532479
+RESP  206  Content-Range: bytes 530432-532479/5042972672  Content-Length: 2048
+      Range: [532480,534527]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000532480-00000000000000534527
+RESP  206  Content-Range: bytes 532480-534527/5042972672  Content-Length: 2048
+      Range: [534528,536575]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000534528-00000000000000536575
+RESP  206  Content-Range: bytes 534528-536575/5042972672  Content-Length: 2048
+      Range: [536576,538623]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000536576-00000000000000538623
+RESP  206  Content-Range: bytes 536576-538623/5042972672  Content-Length: 2048
+      Range: [559104,561151]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000559104-00000000000000561151
+RESP  206  Content-Range: bytes 559104-561151/5042972672  Content-Length: 2048
+      Range: [561152,563199]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000561152-00000000000000563199
+RESP  206  Content-Range: bytes 561152-563199/5042972672  Content-Length: 2048
+      Range: [622592,624639]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000622592-00000000000000624639
+RESP  206  Content-Range: bytes 622592-624639/5042972672  Content-Length: 2048
+      Range: [624640,626687]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000624640-00000000000000626687
+RESP  206  Content-Range: bytes 624640-626687/5042972672  Content-Length: 2048
+      Range: [626688,630783]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000626688-00000000000000630783
+RESP  206  Content-Range: bytes 626688-630783/5042972672  Content-Length: 4096
+      Range: [628736,630783]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000000628736-00000000000000630783
+RESP  206  Content-Range: bytes 628736-630783/5042972672  Content-Length: 2048
+      Range: [2543616,2547711]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000002543616-00000000000002547711
+RESP  206  Content-Range: bytes 2543616-2547711/5042972672  Content-Length: 4096
+      Range: [4814848,4816895]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000004814848-00000000000004816895
+RESP  206  Content-Range: bytes 4814848-4816895/5042972672  Content-Length: 2048
+      Range: [2551808,2555903]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=00000000000002551808-00000000000002555903
+RESP  206  Content-Range: bytes 2551808-2555903/5042972672  Content-Length: 4096
+      Range: [0,255]
+REQ   GET /win2022.iso HTTP/1.1  from 10.10.123.130
+        Host: 10.10.23.108
+        Range: bytes=0-255
+RESP  206  Content-Range: bytes 0-255/5042972672  Content-Length: 256

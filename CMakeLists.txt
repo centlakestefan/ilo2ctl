@@ -86,6 +86,23 @@ target_link_libraries(console_probe PRIVATE ilo2_core)
 add_executable(ilo_power tools/ilo_power.cpp)
 target_link_libraries(ilo_power PRIVATE ilo2_core)
 
+# media_server: serves an ISO for the iLO's virtual media to fetch, on vendored
+# cpp-httplib. Two build requirements that are not obvious and fail loudly if
+# missed (see testdata/ilo2_vm_http_requests.log for why this exists):
+#   * _WIN32_WINNT >= 0x0602 -- httplib.h calls CreateFile2, which MinGW hides
+#     behind a Windows 8 target. Without it the build fails outright.
+#   * a static libstdc++/libgcc/winpthread -- otherwise the binary needs those
+#     DLLs on PATH at run time and dies with no message at all.
+add_executable(media_server tools/media_server.cpp)
+target_link_libraries(media_server PRIVATE ilo2_core)
+if(WIN32)
+    target_compile_definitions(media_server PRIVATE _WIN32_WINNT=0x0A00)
+    if(NOT MSVC)
+        target_link_options(media_server PRIVATE
+            -static -static-libgcc -static-libstdc++)
+    endif()
+endif()
+
 # ---------------------------------------------------------------------------
 # GUI (SDL3 + Dear ImGui)
 #
