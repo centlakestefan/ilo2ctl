@@ -71,6 +71,21 @@ cmake --build build/cmake
 cd build/cmake && ctest --output-on-failure
 ```
 
+Builds on Windows (MinGW) and Linux. The Linux side is checked in a container,
+which needs nothing but a compiler:
+
+```
+docker run --rm -v "$PWD:/src:ro" debian:stable-slim sh -c   'apt-get -qq update && apt-get -qq install -y --no-install-recommends      build-essential cmake ninja-build && cp -a /src /work && cd /work &&    cmake -S . -B b -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build b &&    cd b && ctest --output-on-failure'
+```
+
+(The copy is because CTest runs from the source root and a few tests write
+scratch into `build/`, which a read-only mount will not allow.)
+
+One warning is expected there and is not a defect: GCC 14 emits
+`-Wfree-nonheap-object` for a plain `std::vector` copy in `tests/test_der.cpp`,
+but only at `-O3` — it is clean at `-O0`, `-O1` and `-O2`, which is not how a
+real invalid free behaves.
+
 The GUI is off by default so a bare clone builds and tests with no network:
 
 ```
@@ -167,8 +182,12 @@ defaulted to a stale address), and the sequence it encoded is written down in
 raw RIBCL, with its verified and unverified parts marked, under "The mount +
 one-time-boot sequence" in `testdata/README.md`.
 
-Open: the Linux build has not been compiled yet (the code is branched for it);
-`LocaleTranslator` is unported, so non-US layouts only send ASCII. For virtual
-media the RIBCL commands and the ISO picker are unwritten — `ribcl_body()` still
+Builds and passes its tests on Linux as well as Windows: Debian with GCC 14,
+22/22, with `replay_dvc` and `media_server` exercised too — the latter is the
+only thing that touches the POSIX listening-socket path. The GUI is untested
+there; only the console window has never been run on Linux.
+
+Open: `LocaleTranslator` is unported, so non-US layouts only send ASCII. For
+virtual media the RIBCL commands and the ISO picker are unwritten — `ribcl_body()` still
 hardcodes a `SERVER_INFO` wrapper and virtual media needs `RIB_INFO` — so a
 mount + one-time boot currently has to be driven by hand from the recipe above.
