@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("iLO 2 Remote Console", 1360, 830,
+    SDL_Window* window = SDL_CreateWindow("ilo2ctl", 1360, 830,
                                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
@@ -216,12 +216,22 @@ int main(int argc, char** argv) {
 
     // Recent connections: host and user only, never the password. Stored in
     // the per-user preferences directory SDL picks for this platform.
-    std::string connections_path;
-    if (char* pref = SDL_GetPrefPath("centlake", "ilo2_console")) {
+    std::string connections_path, legacy_connections_path;
+    if (char* pref = SDL_GetPrefPath("centlake", "ilo2ctl")) {
         connections_path = std::string(pref) + "connections.txt";
         SDL_free(pref);
     }
+    // The app was called ilo2_console until it grew power, health and media
+    // control. SDL derives the preferences directory from that name, so the
+    // rename moved it. Read the old location once when the new one is empty;
+    // the next recorded connection writes the list back to the new path.
+    if (char* pref = SDL_GetPrefPath("centlake", "ilo2_console")) {
+        legacy_connections_path = std::string(pref) + "connections.txt";
+        SDL_free(pref);
+    }
     std::vector<SavedConnection> recent = load_connections(connections_path);
+    if (recent.empty() && !legacy_connections_path.empty())
+        recent = load_connections(legacy_connections_path);
     bool connection_recorded = false;
     // With no host on the command line, start from the most recent one so the
     // usual session is: type the password, press Enter.

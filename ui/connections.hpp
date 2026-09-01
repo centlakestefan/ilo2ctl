@@ -43,7 +43,7 @@ inline std::vector<SavedConnection> parse_connections(const std::string& text) {
 }
 
 inline std::string format_connections(const std::vector<SavedConnection>& list) {
-    std::string out = "# ilo2_console: recent connections, most recent first. host<TAB>user\n";
+    std::string out = "# ilo2ctl: recent connections, most recent first. host<TAB>user\n";
     for (const auto& c : list) out += c.host + "\t" + c.user + "\n";
     return out;
 }

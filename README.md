@@ -1,9 +1,14 @@
-# iLO 2 Remote Console — C++ port
+# ilo2ctl — an iLO 2 control tool in C++
 
-A from-scratch C++ reimplementation of the HP iLO 2 remote-console applet
-(`com.hp.ilo2.remcons`, shipped as `rc175p10.jar`), so an iLO 2 (e.g. a ProLiant
-DL380 G6) can be driven headlessly — decode its remote-console video to PNG and,
-later, send mouse/keyboard input — without Java, a browser, or the applet.
+Drive an HP iLO 2 (e.g. a ProLiant DL380 G6) without Java, a browser, or HP's
+applet: remote console with keyboard and mouse, server power and UID, health
+readout, and serving an ISO for virtual media. One static binary, no OpenSSL,
+no external dependencies.
+
+It began as a from-scratch reimplementation of the remote-console applet
+(`com.hp.ilo2.remcons`, shipped as `rc175p10.jar`) — decoding its video and
+sending input — and grew past the console into the rest of what an iLO 2 can be
+told to do over RIBCL, which is where the name comes from.
 
 The applet is **not obfuscated**, so each class was decompiled (CFR) and ported
 class-by-class, with every component validated **byte-for-byte against HP's real
@@ -70,8 +75,8 @@ The GUI is off by default so a bare clone builds and tests with no network:
 
 ```
 cmake -S . -B build/gui -G Ninja -DCMAKE_BUILD_TYPE=Release -DILO2_BUILD_GUI=ON
-cmake --build build/gui --target ilo2_console
-build/gui/ilo2_console --host 10.10.123.130
+cmake --build build/gui --target ilo2ctl
+build/gui/ilo2ctl --host 10.10.123.130
 ```
 
 That clones pinned SDL3 (`release-3.4.14`) and Dear ImGui (`v1.92.9`) and links

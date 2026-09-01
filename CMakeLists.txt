@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ilo2console LANGUAGES CXX)
+project(ilo2ctl LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -114,7 +114,7 @@ endif()
 # point of vendoring rather than find_package is that both platforms build the
 # same versions without depending on what a distro happens to ship.
 # ---------------------------------------------------------------------------
-option(ILO2_BUILD_GUI "Build the SDL3 console window" OFF)
+option(ILO2_BUILD_GUI "Build the ilo2ctl GUI (SDL3 window)" OFF)
 
 if(ILO2_BUILD_GUI)
     include(FetchContent)
@@ -152,7 +152,7 @@ if(ILO2_BUILD_GUI)
         ${imgui_SOURCE_DIR}/backends)
     target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
 
-    add_executable(ilo2_console WIN32 ui/sdl_main.cpp)
-    target_link_libraries(ilo2_console PRIVATE ilo2_core imgui SDL3::SDL3-static)
+    add_executable(ilo2ctl WIN32 ui/sdl_main.cpp)
+    target_link_libraries(ilo2ctl PRIVATE ilo2_core imgui SDL3::SDL3-static)
     # WIN32 above suppresses the console window on Windows; SDL provides main().
 endif()
