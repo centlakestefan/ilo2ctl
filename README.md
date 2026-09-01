@@ -86,6 +86,23 @@ One warning is expected there and is not a defect: GCC 14 emits
 but only at `-O3` — it is clean at `-O0`, `-O1` and `-O2`, which is not how a
 real invalid free behaves.
 
+Building the GUI on Linux needs SDL3's own dependencies. This set works on
+Debian 13; it has not been minimised:
+
+```
+build-essential cmake ninja-build git ca-certificates pkg-config
+libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev
+libxss-dev libxtst-dev libxinerama-dev libxkbcommon-dev libwayland-dev
+wayland-protocols libdecor-0-dev libgl1-mesa-dev libegl1-mesa-dev
+libasound2-dev libdbus-1-dev libudev-dev
+```
+
+Two of those are easy to trip over. SDL3 **refuses to configure** with no X11
+or Wayland development libraries at all, even for a headless build where only
+the dummy video driver is wanted, and it separately insists on XTEST
+(`libxtst-dev`) once X11 is found. Neither is needed to *run* headless — only
+to build.
+
 The GUI is off by default so a bare clone builds and tests with no network:
 
 ```
@@ -182,10 +199,12 @@ defaulted to a stale address), and the sequence it encoded is written down in
 raw RIBCL, with its verified and unverified parts marked, under "The mount +
 one-time-boot sequence" in `testdata/README.md`.
 
-Builds and passes its tests on Linux as well as Windows: Debian with GCC 14,
+Builds and passes its tests on Linux as well as Windows: Debian 13 with GCC 14,
 22/22, with `replay_dvc` and `media_server` exercised too — the latter is the
-only thing that touches the POSIX listening-socket path. The GUI is untested
-there; only the console window has never been run on Linux.
+only thing that touches the POSIX listening-socket path. The GUI builds there
+as well, with no warnings in this project's own code, and renders correctly
+under `SDL_VIDEO_DRIVER=dummy` against a replay fixture. What has *not* happened
+on Linux is a run against real hardware, or against a real display server.
 
 Open: `LocaleTranslator` is unported, so non-US layouts only send ASCII. For
 virtual media the RIBCL commands and the ISO picker are unwritten — `ribcl_body()` still
