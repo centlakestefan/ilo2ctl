@@ -85,6 +85,10 @@ inline std::string ribcl_body(RibclCommand c) {
            "\">\r\n" + inner + "\r\n</SERVER_INFO>";
 }
 
+// The VERSION="2.22" below is the RIBCL schema the firmware speaks, not its
+// firmware version (2.29 on the box this was measured against) -- easy to
+// confuse, since the schema version is what every reply puts in your face.
+//
 // The reply is a run of <RIBCL VERSION="2.22"><RESPONSE STATUS="0x0000"
 // MESSAGE='No error'/>...</RIBCL> documents, one per stage. What a caller
 // wants out of it is whether any stage failed, what it said, and, for a status
@@ -166,7 +170,7 @@ inline std::string ribcl_document(const std::string& user, const std::string& pa
 // When is a reply over? The firmware answers every tag it parses with its own
 // <RIBCL> document -- the prolog, <RIBCL>, <LOGIN>, <SERVER_INFO>, the
 // command, the closing tags -- and the count varies by command (measured on
-// firmware 2.22: a UID write yields 8, SET_HOST_POWER 9), so counting is not
+// firmware 2.29: a UID write yields 8, SET_HOST_POWER 9), so counting is not
 // reliable. What is reliable is that the documents stream back-to-back and
 // the firmware then goes silent without closing. ribcl_run therefore reads
 // with a short receive timeout once data has started arriving, and treats

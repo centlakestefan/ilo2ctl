@@ -37,7 +37,7 @@ repository, has never been committed to it, and nothing here needs it.
 | `ui/sdl_main.cpp` | the standalone console window (SDL3 + Dear ImGui) | live iLO 2 |
 | `ui/power_control.hpp` | RIBCL worker behind the panel's power buttons | live iLO 2 |
 | `ui/connections.hpp` | recent host/user list (never the password) | `test_connections` |
-| `ilo/ribcl.hpp` | RIBCL over raw TLS: power status/on/off/reset, UID, health | live iLO 2 (fw 2.22) |
+| `ilo/ribcl.hpp` | RIBCL over raw TLS: power status/on/off/reset, UID, health | live iLO 2 (fw 2.29) |
 | `ilo/health.hpp` | GET_EMBEDDED_HEALTH / GET_POWER_READINGS parser | `testdata/*.xml` captured from the iLO |
 | `tools/ilo_power.cpp` | RIBCL from the command line | live iLO 2 |
 | `tools/console_probe.cpp` | drives the seam like a front end would | live iLO 2 |

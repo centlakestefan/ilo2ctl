@@ -7,7 +7,7 @@
 // the report deserves, so this is a tag scanner that walks the document in
 // order and fills flat records, which is all the panel needs.
 //
-// Shapes measured on firmware 2.22 (testdata/embedded_health.xml):
+// Shapes measured on firmware 2.29 (testdata/embedded_health.xml):
 //
 //   <FANS><FAN><LABEL VALUE = "Fan 1"/><ZONE .../><STATUS .../>
 //               <SPEED VALUE = "13" UNIT="Percentage"/></FAN>...</FANS>

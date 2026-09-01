@@ -1,5 +1,5 @@
 // test_health.cpp — the health/power-readings parser against replies
-// captured from a real iLO 2 (firmware 2.22), plus the scanner's tolerance
+// captured from a real iLO 2 (firmware 2.29), plus the scanner's tolerance
 // for the firmware's loose XML.
 #include <cstdio>
 #include <string>

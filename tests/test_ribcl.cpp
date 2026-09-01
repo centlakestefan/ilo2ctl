@@ -41,7 +41,7 @@ struct FakeClient {
     }
 };
 
-// One acknowledgement document, as firmware 2.22 emits it for every tag it
+// One acknowledgement document, as firmware 2.29 emits it for every tag it
 // parses. A reply is a run of these; a status read carries HOST_POWER in the
 // command's own (fifth) one.
 #define PLAIN_DOC "<?xml version=\"1.0\"?>\r\n<RIBCL VERSION=\"2.22\">\r\n<RESPONSE\r\n    STATUS=\"0x0000\"\r\n    MESSAGE='No error'\r\n     />\r\n</RIBCL>\r\n"

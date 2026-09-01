@@ -94,6 +94,49 @@ distinct colors: 1
   and the payload is already decrypted; the login handshake is not included.
   They do depict the server's lock screen (wallpaper, clock, hostname-free).
 
+## RIBCL XML replies
+
+Raw replies from the iLO's RIBCL interface, saved exactly as the firmware sent
+them: the whole run of back-to-back `<RIBCL>` documents, redundant `RESPONSE`
+stages, loose attribute spacing and CRLF endings included. Coping with that
+shape is the parser's job, so the fixtures must not be tidied.
+
+Captured 2026-09-01 from the iLO 2 at 10.10.123.130, **firmware 2.29**
+(Jul 16 2015), licence type `iLO 2 Advanced`. The `VERSION="2.22"` on every
+`<RIBCL>` element is the RIBCL *schema* version the firmware speaks, not its
+firmware version -- the two are easy to confuse.
+
+| Fixture | Command | Wrapper |
+|---|---|---|
+| `embedded_health.xml` | `GET_EMBEDDED_HEALTH` | `SERVER_INFO` |
+| `power_readings.xml` | `GET_POWER_READINGS` | `SERVER_INFO` |
+| `vm_status_cdrom.xml` | `GET_VM_STATUS DEVICE="CDROM"` | **`RIB_INFO`** |
+| `vm_status_floppy.xml` | `GET_VM_STATUS DEVICE="FLOPPY"` | **`RIB_INFO`** |
+| `one_time_boot.xml` | `GET_ONE_TIME_BOOT` | `SERVER_INFO` |
+| `persistent_boot.xml` | `GET_PERSISTENT_BOOT` | `SERVER_INFO` |
+| `fw_version.xml` | `GET_FW_VERSION` | `RIB_INFO` |
+
+**The wrapper is not uniform, and getting it wrong is not a soft failure.**
+Virtual-media and firmware commands live under `<RIB_INFO>`; power, health and
+boot-order commands live under `<SERVER_INFO>`. Sending `GET_VM_STATUS` inside
+`SERVER_INFO` is answered
+
+```
+STATUS="0x0001"
+MESSAGE='Syntax error: Line #0: syntax error near "GET_VM_STATUS" in the line: ""'
+```
+
+after four perfectly happy `No error` stages, so a caller that only checks
+whether it got a reply will think it succeeded. This is why `ribcl_body()`
+cannot keep hardcoding one wrapper once virtual media is ported.
+
+The virtual-media state at capture time was idle -- nothing inserted, so
+`IMAGE_URL` is empty and `BOOT_OPTION` is `NO_BOOT`. `WRITE_PROTECT` differs by
+device out of the box: `YES` for CDROM, `NO` for FLOPPY.
+
+All seven are read-only commands. The replies carry no credentials, no session
+tokens and no image URLs.
+
 ## `ilo_cert.der` (612 bytes)
 
 The X.509 certificate the iLO 2 serves on port 443, captured with a raw
