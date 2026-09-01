@@ -26,17 +26,15 @@ endif()
 # ---------------------------------------------------------------------------
 # Tests
 #
-# Two kinds live side by side, deliberately:
-#   * self-asserting  -- known-answer vectors / reference oracles, exit non-zero
-#                        on mismatch, so CTest is meaningful.
-#   * oracle-diff     -- print a trace to be diffed against the Java probe in
-#                        tests/*Probe.java (needs HP's rc175p10.jar, which is not
-#                        redistributable). Registered anyway: running them proves
-#                        the ports still compile and execute.
+# Every test is self-asserting: it exits non-zero on mismatch, so CTest is
+# meaningful and `ctest` is the whole story. The ports that were validated
+# against HP's bytecode compare against frozen recordings of it in
+# tests/oracle/ -- see that directory's README. Nothing here needs Java or
+# HP's rc175p10.jar, which is not redistributable and is not in this repo.
 # ---------------------------------------------------------------------------
 enable_testing()
 
-set(SELF_ASSERTING_TESTS
+set(TESTS
     test_sha1
     test_hmac
     test_bigint
@@ -53,8 +51,6 @@ set(SELF_ASSERTING_TESTS
     test_health
     test_random
     test_crypto
-)
-set(ORACLE_DIFF_TESTS
     test_dvc_bits
     test_dvc_cache
     test_dvc_decoder
@@ -63,13 +59,13 @@ set(ORACLE_DIFF_TESTS
     test_telnet
 )
 
-foreach(t ${SELF_ASSERTING_TESTS} ${ORACLE_DIFF_TESTS})
+foreach(t ${TESTS})
     add_executable(${t} tests/${t}.cpp)
     target_link_libraries(${t} PRIVATE ilo2_core)
     add_test(NAME ${t} COMMAND ${t} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
-# Several oracle-diff tests write traces into build/ from the source root.
+# A few tests write intermediate streams into build/ from the source root.
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
 
 # ---------------------------------------------------------------------------

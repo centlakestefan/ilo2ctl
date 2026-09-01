@@ -1,9 +1,12 @@
 // test_dvc_cache.cpp — validates dvc_cache.hpp against the real cim.
 //
-// Writes color_remap to build/remap_cpp.txt and a per-op LRU-cache trace to
-// build/cache_cpp.txt, to be diffed against DvcCacheProbe.java.
+// Both expected traces are HP's, recorded from com.hp.ilo2.remcons.cim by
+// tests/DvcCacheProbe.java and frozen as tests/oracle/remap.txt (the full
+// 4096-entry colour remap) and tests/oracle/cache.txt (a per-op LRU trace).
+// The op script below is identical to the probe's, so the two line up 1:1.
 #include <cstdio>
 #include <string>
+#include "tests/test_util.hpp"
 #include "ilo/dvc_cache.hpp"
 
 using namespace ilo2;
@@ -36,32 +39,40 @@ static std::string join(const int* a, int n) {
     return s;
 }
 
-int main() {
-    // color_remap full table
-    if (FILE* f = std::fopen("build/remap_cpp.txt", "wb")) {
-        for (int i = 0; i < 4096; ++i) std::fprintf(f, "%d%c", dvc_color_remap(i), i == 4095 ? '\n' : ' ');
-        std::fclose(f);
+static std::string remap_table() {
+    std::string s;
+    char buf[16];
+    for (int i = 0; i < 4096; ++i) {
+        std::snprintf(buf, sizeof buf, "%d%c", dvc_color_remap(i), i == 4095 ? '\n' : ' ');
+        s += buf;
     }
+    return s;
+}
 
+static std::string cache_trace() {
     DvcCache c;
-    FILE* out = std::fopen("build/cache_cpp.txt", "wb");
-    if (!out) { std::fprintf(stderr, "cannot write cache trace\n"); return 2; }
-
+    std::string s;
+    char buf[512];
     for (int i = 0; i < NOPS; ++i) {
-        char t = OPT[i]; int arg = OPA[i]; int ret = 0; std::string label;
-        switch (t) {
-            case 'R': c.cache_reset();        label = "R";                    break;
-            case 'L': ret = c.cache_lru(arg); label = "L" + std::to_string(arg); break;
-            case 'F': ret = c.cache_find(arg);label = "F" + std::to_string(arg); break;
-            case 'P': c.cache_prune();         label = "P";                    break;
+        char type = OPT[i]; int arg = OPA[i]; int ret = 0; std::string label;
+        switch (type) {
+            case 'R': c.cache_reset();         label = "R";                          break;
+            case 'L': ret = c.cache_lru(arg);  label = "L" + std::to_string(arg);     break;
+            case 'F': ret = c.cache_find(arg); label = "F" + std::to_string(arg);     break;
+            case 'P': c.cache_prune();         label = "P";                          break;
         }
-        std::fprintf(out, "%s a=%d pc=%d n31=%d ret=%d C=%s U=%s B=%s\n",
-                     label.c_str(), c.cc_active, c.pixcode, c.next_1_31, ret,
-                     join(c.cc_color, c.cc_active).c_str(),
-                     join(c.cc_usage, c.cc_active).c_str(),
-                     join(c.cc_block, c.cc_active).c_str());
+        std::snprintf(buf, sizeof buf, "%s a=%d pc=%d n31=%d ret=%d C=%s U=%s B=%s\n",
+                      label.c_str(), c.cc_active, c.pixcode, c.next_1_31, ret,
+                      join(c.cc_color, c.cc_active).c_str(),
+                      join(c.cc_usage, c.cc_active).c_str(),
+                      join(c.cc_block, c.cc_active).c_str());
+        s += buf;
     }
-    std::fclose(out);
-    printf("wrote build/cache_cpp.txt (%d ops) and build/remap_cpp.txt\n", NOPS);
-    return 0;
+    return s;
+}
+
+int main() {
+    t::eq_oracle(remap_table(), "remap");
+    t::eq_oracle(cache_trace(), "cache");
+    return t::report("test_dvc_cache");
 }

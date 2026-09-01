@@ -1,7 +1,7 @@
 # DVC capture fixtures
 
 Decrypted DVC video streams recorded from a live HP iLO 2 (ProLiant DL380 G6,
-1024x768) on 2026-08-17 with `capture_console.py`. These are the bytes *after*
+1024x768) on 2026-08-17 with `tools/capture_dvc.cpp`. These are the bytes *after*
 RC4 decryption — everything the decoder sees following the `ESC [ R` trigger —
 so replaying them needs no hardware, no credentials and no network.
 
@@ -14,8 +14,8 @@ entirely black image. See `lock_screen_wake.bin` below.
 ## Replaying
 
 ```sh
-g++ -O2 -std=c++17 -o build/replay_dvc.exe cpp/replay_dvc.cpp
-./build/replay_dvc.exe testdata/lock_screen_settled.bin build/out.png
+cmake --build build/cmake --target replay_dvc
+build/cmake/replay_dvc testdata/lock_screen_settled.bin build/out.png
 ```
 
 ## The fixtures

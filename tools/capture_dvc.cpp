@@ -11,8 +11,8 @@
 //   2. runs those same bytes through FramebufferDecoder and saves PNGs, so the
 //      result can be eyeballed immediately.
 //
-// Session parameters (login token, keys) come from the iLO's drc2fram.htm page;
-// capture_console.py scrapes them and invokes this binary.
+// Session parameters (login token, keys) come from the iLO's drc2fram.htm page.
+// With no --info0 given, this binary scrapes them itself via ilo/ilo_session.hpp.
 //
 // Build:
 //   cmake -S . -B build/cmake -G Ninja && cmake --build build/cmake --target capture_dvc
@@ -198,8 +198,8 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    // No INFO0 given: acquire a session ourselves, which is what
-    // capture_console.py used to do by shelling out to curl.
+    // No INFO0 given: acquire a session ourselves, which the Python wrapper
+    // this replaced used to do by shelling out to curl.
     if (info0.empty()) {
         const std::string pw = read_ilo_password(pass, pass_file);
         if (pw.empty()) {

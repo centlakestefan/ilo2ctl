@@ -1,14 +1,15 @@
 // ilo_session.hpp — acquire a remote-console session from an iLO 2 over HTTPS.
 //
-// This is the C++ port of what capture_console.py did by shelling out to
-// `curl -k --tlsv1.0 --tls-max 1.0`: log in to get a session cookie, then scrape
-// the applet parameters out of drc2fram.htm. It now runs on tls/client.hpp, so
-// the capture path has no external dependency at all.
+// Log in to get a session cookie, then scrape the applet parameters out of
+// drc2fram.htm. This runs on tls/client.hpp, so the capture path has no
+// external dependency at all.
 //
-// Dropping curl was not cosmetic. The curl on the development box is
-// Schannel-backed, which is the only reason it could still negotiate TLS 1.0; a
-// Linux curl links the system OpenSSL 3, where TLS 1.0 sits below the default
-// security level, so the Python scrapers simply did not work there.
+// It replaced a Python scraper that shelled out to `curl -k --tlsv1.0
+// --tls-max 1.0`, and dropping curl was not cosmetic. The curl on the
+// development box is Schannel-backed, which is the only reason it could still
+// negotiate TLS 1.0; a Linux curl links the system OpenSSL 3, where TLS 1.0
+// sits below the default security level, so that scraper simply did not work
+// there.
 //
 // Two behaviours of this firmware are worth knowing before reading the code:
 //

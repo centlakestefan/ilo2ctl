@@ -4,8 +4,10 @@
 // constructor / randomValue() / update_key(). Compile against the real jar and
 // run; its output must match test_crypto's [RC4] lines byte-for-byte.
 //
-//   javac -cp rc175p10.jar -d build cpp/KeystreamDump.java
-//   java  -cp "rc175p10.jar;build" com.hp.ilo2.remcons.KeystreamDump
+// Not part of the test suite and not needed to build or run it: the
+// values this produced are frozen in tests/oracle/. Rebuilding them
+// needs a copy of HP's rc175p10.jar you obtain yourself -- see
+// tests/oracle/README.md for the compile-and-run recipe.
 package com.hp.ilo2.remcons;
 
 public class KeystreamDump {

@@ -2,8 +2,13 @@
 // match the formula test_png.cpp used to generate it. Confirms the stb PNG
 // encoder produces correct, standard-decodable output.
 //
-//   javac -d build cpp/PngCheck.java
-//   java  -cp build PngCheck
+// Not part of the test suite: test_png.cpp asserts against the frozen bytes in
+// tests/oracle/gradient.png, and this is what confirmed those bytes decode to
+// the right pixels. Unlike the other probes it touches no HP class -- only
+// javax.imageio -- so it re-runs with nothing but a JDK:
+//
+//   javac -d build/probe tests/PngCheck.java
+//   java -cp build/probe PngCheck
 import java.awt.image.BufferedImage;
 import java.io.File;
 import javax.imageio.ImageIO;

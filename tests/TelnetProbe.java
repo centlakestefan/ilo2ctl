@@ -5,9 +5,6 @@
 // lets telnet.run() detect the ESC '[' 'R' trigger and RC4-decrypt the DVC
 // payload, and prints the decrypted bytes as hex for comparison with the C++.
 //
-//   javac -cp rc175p10.jar -d build cpp/TelnetProbe.java
-//   java  -cp "rc175p10.jar;build" com.hp.ilo2.remcons.TelnetProbe
-//
 // Lives in the applet package so it can override the package-private
 // process_dvc() and touch the protected `screen` field.
 package com.hp.ilo2.remcons;

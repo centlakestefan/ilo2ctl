@@ -1,5 +1,6 @@
-// test_util.hpp — shared helpers for the self-asserting crypto tests.
+// test_util.hpp — shared helpers for the self-asserting tests.
 #pragma once
+#include <algorithm>
 #include <cstdio>
 #include <cstdint>
 #include <string>
@@ -50,6 +51,68 @@ inline bool ok(bool cond, const char* what) {
     if (cond) return true;
     ++failures;
     std::printf("  FAIL %s\n", what);
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// Oracle fixtures (tests/oracle/*.txt)
+//
+// Traces recorded from HP's real bytecode via tests/*Probe.java and frozen, so
+// the ports stay pinned to the applet's observed behaviour without anyone
+// needing the (non-redistributable) rc175p10.jar. How they were produced and
+// how to regenerate them is in tests/oracle/README.md; neither the build nor
+// the test suite requires the jar.
+// ---------------------------------------------------------------------------
+
+// Read a fixture. CR is stripped so a CRLF checkout on Windows still compares
+// equal -- .gitattributes marks these -text, but do not rely on that alone.
+inline std::string read_oracle(const std::string& name) {
+    const std::string path = "tests/oracle/" + name + ".txt";
+    std::FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) {
+        ++checks; ++failures;
+        std::printf("  FAIL missing oracle fixture %s\n", path.c_str());
+        return std::string();
+    }
+    std::string s;
+    char buf[65536];
+    size_t n;
+    while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) s.append(buf, n);
+    std::fclose(f);
+    s.erase(std::remove(s.begin(), s.end(), '\r'), s.end());
+    return s;
+}
+
+// Compare a generated trace against a frozen oracle fixture. On mismatch report
+// the first differing line rather than dumping a megabyte of trace.
+inline bool eq_oracle(const std::string& got, const std::string& name) {
+    ++checks;
+    const std::string want = read_oracle(name);
+    if (want.empty()) return false;      // read_oracle already counted the failure
+    std::string g = got;
+    g.erase(std::remove(g.begin(), g.end(), '\r'), g.end());
+    if (!g.empty() && g.back() != '\n') g += '\n';
+    if (g == want) return true;
+    ++failures;
+
+    size_t gi = 0, wi = 0, line = 1;
+    while (gi < g.size() && wi < want.size()) {
+        size_t ge = g.find('\n', gi), we = want.find('\n', wi);
+        if (ge == std::string::npos) ge = g.size();
+        if (we == std::string::npos) we = want.size();
+        if (g.compare(gi, ge - gi, want, wi, we - wi) != 0) {
+            std::printf("  FAIL oracle %s differs at line %zu\n"
+                        "       got  %s\n       want %s\n",
+                        name.c_str(), line,
+                        g.substr(gi, ge - gi).c_str(),
+                        want.substr(wi, we - wi).c_str());
+            return false;
+        }
+        gi = ge + 1; wi = we + 1; ++line;
+    }
+    std::printf("  FAIL oracle %s: length differs (got %zu bytes, want %zu) "
+                "after %zu identical lines\n",
+                name.c_str(), g.size(), want.size(), line - 1);
     return false;
 }
 

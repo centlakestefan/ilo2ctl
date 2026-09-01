@@ -1,5 +1,7 @@
 // test_telnet.cpp — validates telnet.hpp's receive-loop state machine + RC4
-// decryption against the real applet (via TelnetProbe.java driving telnet.run()).
+// decryption against the real applet. The expected payload is what HP's
+// telnet.run() produced for this exact stream, recorded by tests/TelnetProbe.java
+// and pinned as a literal below, so the test needs neither Java nor the jar.
 //
 // It builds a byte stream that exercises the ESC '[' 'R' trigger detection
 // (including false starts that must reset the state machine), writes it to
@@ -9,6 +11,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include "tests/test_util.hpp"
 #include "ilo/telnet.hpp"
 #include "crypto/rc4.hpp"
 
@@ -64,17 +67,23 @@ int main() {
         return 2;
     }
 
-    CaptureTelnet t;
-    t.setup_decryption(key);
-    t.drive(stream);
+    CaptureTelnet tel;
+    tel.setup_decryption(key);
+    tel.drive(stream);
 
-    std::string got = hex(t.dvc.data(), t.dvc.size());
-    std::string want = hex(plain.data(), plain.size());
-    bool ok = (t.dvc == plain);
+    const std::string got = hex(tel.dvc.data(), tel.dvc.size());
 
-    printf("cpp_dvc %s\n", got.c_str());
-    printf("expect  %s\n", want.c_str());
-    printf("round-trip decrypt: %s\n", ok ? "OK" : "FAIL");
-    printf("wrote build/telnet_stream.bin (%zu bytes)\n", stream.size());
-    return ok ? 0 : 1;
+    // The payload the C++ decrypter must recover, computed independently here.
+    t::eq(got, hex(plain.data(), plain.size()), "round-trip decrypt");
+
+    // The same payload as HP's telnet.run() actually produced for this stream,
+    // recorded by tests/TelnetProbe.java. Pinning the literal keeps the trigger
+    // detection and keystream alignment tied to the applet's real behaviour
+    // without needing Java or the jar.
+    t::eq(got,
+          "05121f2c394653606d7a8794a1aebbc8d5e2effc091623303d4a5764717e8b98"
+          "a5b2bfccd9e6f3000d1a2734414e5b68",
+          "decrypted DVC payload vs real telnet.run()");
+
+    return t::report("test_telnet");
 }

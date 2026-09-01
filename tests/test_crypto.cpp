@@ -1,8 +1,8 @@
 // test_crypto.cpp — validates the C++ RC4/MD5 ports.
 //
 //  1. MD5 against known RFC/standard test vectors.
-//  2. RC4 keystream (initial + after one rekey) printed as hex, to be diffed
-//     against the real Java classes via KeystreamDump.java.
+//  2. RC4 keystream (initial + after one rekey) against the keystream HP's own
+//     RC4 class produced, recorded by tests/KeystreamDump.java.
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -48,17 +48,34 @@ int main() {
     uint8_t seed[16];
     for (int i = 0; i < 16; ++i) seed[i] = static_cast<uint8_t>(i * 17 + 3);
 
+    // Expected keystreams are HP's, recorded from com.hp.ilo2.remcons.RC4 by
+    // tests/KeystreamDump.java using this same seed. Pinning them keeps both
+    // the standard KSA/PRGA and HP's own MD5 rekey derivation tied to the
+    // applet's real behaviour without needing Java or the jar.
+    struct { const char* what; const char* want; } rv[] = {
+        {"RC4 keystream, initial",
+         "bb6b156f15af631d4bc5dbaeda7e92f20f3dd84d544ba1dabefd80adb0a59255"},
+        {"RC4 keystream, after update_key()",
+         "3627de4f6abf540c9594025d780f8dda28a89b624b13b6c380b2c53ca69adf28"},
+    };
+
     RC4 r(seed);
-    uint8_t ks1[32];
-    for (int i = 0; i < 32; ++i) ks1[i] = r.randomValue();
-    printf("[RC4] initial   %s\n", hex(ks1, 32).c_str());
+    uint8_t ks[32];
+    for (int i = 0; i < 32; ++i) ks[i] = r.randomValue();
+    std::string got = hex(ks, 32);
+    bool ok1 = (got == rv[0].want);
+    fails += !ok1;
+    printf("[RC4] initial    %s %s\n", got.c_str(), ok1 ? "OK" : "FAIL");
+    if (!ok1) printf("      want       %s\n", rv[0].want);
 
     r.update_key();  // rekey (TELNET_CHG_ENCRYPT_KEYS)
-    uint8_t ks2[32];
-    for (int i = 0; i < 32; ++i) ks2[i] = r.randomValue();
-    printf("[RC4] post-rekey %s\n", hex(ks2, 32).c_str());
+    for (int i = 0; i < 32; ++i) ks[i] = r.randomValue();
+    got = hex(ks, 32);
+    bool ok2 = (got == rv[1].want);
+    fails += !ok2;
+    printf("[RC4] post-rekey %s %s\n", got.c_str(), ok2 ? "OK" : "FAIL");
+    if (!ok2) printf("      want       %s\n", rv[1].want);
 
-    printf("\n%s\n", fails ? "MD5 VECTORS FAILED" : "MD5 vectors passed.");
-    printf("Compare the two [RC4] lines against KeystreamDump.java output.\n");
+    printf("\ntest_crypto: %s\n", fails ? "FAILED" : "all passed");
     return fails ? 1 : 0;
 }

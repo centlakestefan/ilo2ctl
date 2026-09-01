@@ -5,9 +5,14 @@ A from-scratch C++ reimplementation of the HP iLO 2 remote-console applet
 DL380 G6) can be driven headlessly — decode its remote-console video to PNG and,
 later, send mouse/keyboard input — without Java, a browser, or the applet.
 
-The applet is **not obfuscated**, so each class is decompiled (CFR) and ported
+The applet is **not obfuscated**, so each class was decompiled (CFR) and ported
 class-by-class, with every component validated **byte-for-byte against HP's real
 bytecode** via small Java oracles (reflection / recording subclasses).
+
+Those recordings are frozen in `tests/oracle/`, so the whole suite asserts
+against HP's observed behaviour with **no jar, no Java and no network** — see
+`tests/oracle/README.md`. HP's `rc175p10.jar` is proprietary: it is not in this
+repository, has never been committed to it, and nothing here needs it.
 
 ## Layout
 
@@ -34,7 +39,7 @@ bytecode** via small Java oracles (reflection / recording subclasses).
 | `ui/connections.hpp` | recent host/user list (never the password) | `test_connections` |
 | `ilo/ribcl.hpp` | RIBCL over raw TLS: power status/on/off/reset, UID, health | live iLO 2 (fw 2.22) |
 | `ilo/health.hpp` | GET_EMBEDDED_HEALTH / GET_POWER_READINGS parser | `testdata/*.xml` captured from the iLO |
-| `tools/ilo_power.cpp` | RIBCL from the command line (replaces `ilo_power.py`) | live iLO 2 |
+| `tools/ilo_power.cpp` | RIBCL from the command line | live iLO 2 |
 | `tools/console_probe.cpp` | drives the seam like a front end would | live iLO 2 |
 | `ilo/telnet.hpp` | transport: socket, login, DVC trigger, decrypt | real `telnet.run()` |
 | `ilo/dvc_bits.hpp` | DVC bit reader (reversal tables, get/add_bits) | real `cim` reflection |
@@ -45,10 +50,10 @@ bytecode** via small Java oracles (reflection / recording subclasses).
 | `ilo/ilo2_session.hpp` | outbound session layer (RC4 encrypt, key index) | live iLO 2 |
 | `tools/capture_dvc.cpp` | live capture -> `.bin` + PNG | — |
 | `tools/replay_dvc.cpp` | offline replay + decoder stats | `testdata/` fixtures |
-| `tests/*Probe.java`, `tests/test_*.cpp` | validation oracles + tests | — |
-| `capture_console.py` | thin shim; `capture_dvc` now logs in itself | — |
-| `launch_console.py` | original: applet launcher (still uses curl) | — |
-| `mount_and_boot.py` | original: virtual-media mount + boot via `hpilo` | — |
+| `tests/oracle/` | frozen recordings of HP's bytecode (the expected values) | — |
+| `tests/test_*.cpp` | the suite; every test self-asserting | `tests/oracle/` + generated vectors |
+| `tests/*Probe.java` | how those recordings were made; needs a jar you supply | — |
+| `mount_and_boot.py` | virtual-media mount + boot via `hpilo` (unported) | — |
 | `range_http_server.py` | HTTP server with Range support for virtual media | — |
 
 Local includes are root-relative (`#include "crypto/md5.hpp"`), so the source
@@ -77,7 +82,9 @@ fixture with no hardware, `--tab power|health` picks the starting tab, and `--sc
 and exits, which works under `SDL_VIDEO_DRIVER=dummy` for checking the front end
 without a window.
 
-- Oracles: JDK 17 `javac`/`java`, compiled against `rc175p10.jar` (not tracked).
+- No Java is required. The oracles that recorded `tests/oracle/` needed JDK 17
+  and HP's jar; re-running them is optional and documented in
+  `tests/oracle/README.md`.
 - stb: exactly one TU defines `STB_IMAGE_WRITE_IMPLEMENTATION` before including
   `third_party/stb_image_write.h`.
 - Reference vectors are generated, not transcribed:
@@ -86,9 +93,11 @@ without a window.
 
 ## Not tracked (see `.gitignore`)
 
-`rc175p10.jar` is HP proprietary — obtain it from the iLO 2 and place it here to
-run the Java oracles; `_decomp/` and `_extract/` are regenerated from it with
-CFR. `build/` and `console.html` (holds a live session token) are generated.
+`build/` is generated. `rc175p10.jar` is HP proprietary and deliberately absent:
+it is not required to build, test, or run anything here. It is only needed to
+regenerate the `tests/oracle/` fixtures, which is optional — obtain your own
+copy from an iLO 2 if you want to, and note that `.gitignore` refuses to commit
+it or the `_decomp/` and `_extract/` trees CFR produces from it.
 
 ## Status
 

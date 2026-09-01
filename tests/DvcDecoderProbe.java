@@ -6,8 +6,10 @@
 // paste/dimension/text events (captured by a recording dvcwin subclass). Output
 // must match the C++ decoder's snapshot byte-for-byte.
 //
-//   javac -cp rc175p10.jar -d build cpp/DvcDecoderProbe.java
-//   java  -cp "rc175p10.jar;build" com.hp.ilo2.remcons.DvcDecoderProbe
+// Not part of the test suite and not needed to build or run it: the
+// values this produced are frozen in tests/oracle/. Rebuilding them
+// needs a copy of HP's rc175p10.jar you obtain yourself -- see
+// tests/oracle/README.md for the compile-and-run recipe.
 package com.hp.ilo2.remcons;
 
 import java.io.ByteArrayOutputStream;

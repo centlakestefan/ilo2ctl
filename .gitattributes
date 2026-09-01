@@ -6,4 +6,8 @@
 *.bin binary
 *.png binary
 *.der binary
-*.jar binary
+
+# Oracle recordings of HP's bytecode (tests/oracle/). The tests compare these
+# byte-for-byte, and they were frozen with LF endings on Windows -- never let
+# autocrlf rewrite them on checkout.
+tests/oracle/*.txt -text

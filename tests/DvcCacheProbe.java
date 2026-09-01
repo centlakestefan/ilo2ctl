@@ -6,8 +6,10 @@
 // process_dvc once with the FSM inhibited, so no bytes are decoded and no GUI
 // is touched).
 //
-//   javac -cp rc175p10.jar -d build cpp/DvcCacheProbe.java
-//   java  -cp "rc175p10.jar;build" com.hp.ilo2.remcons.DvcCacheProbe
+// Not part of the test suite and not needed to build or run it: the
+// values this produced are frozen in tests/oracle/. Rebuilding them
+// needs a copy of HP's rc175p10.jar you obtain yourself -- see
+// tests/oracle/README.md for the compile-and-run recipe.
 package com.hp.ilo2.remcons;
 
 import java.io.PrintWriter;

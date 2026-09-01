@@ -1,12 +1,20 @@
 // test_dvc_decoder.cpp — equivalence test for dvc_decoder.hpp against the real
 // cim FSM. Generates a deterministic byte stream (random bytes punctuated by
 // zero-runs that trigger the reset marker, so the decoder keeps re-traversing
-// the state tree instead of latching forever), writes it to
-// build/decoder_stream.bin for the Java oracle to replay, feeds it through the
-// C++ decoder, and snapshots the full decoder state after every byte.
+// the state tree instead of latching forever), feeds it through the C++
+// decoder, and snapshots the full decoder state after every byte.
+//
+// Both expected traces are HP's, recorded by tests/DvcDecoderProbe.java (a
+// recording subclass of com.hp.ilo2.remcons.cim replaying the identical
+// stream) and frozen as tests/oracle/decoder.txt — the per-byte state
+// snapshot — and tests/oracle/decoder_events.txt — the paste/dimension/text
+// callbacks. The stream is still written to build/decoder_stream.bin: it is
+// what test_png's pipeline smoke test consumes, and what the probe replays if
+// anyone regenerates the fixtures.
 #include <cstdio>
 #include <cstdint>
 #include <string>
+#include "tests/test_util.hpp"
 #include "ilo/dvc_decoder.hpp"
 
 using namespace ilo2;
@@ -42,12 +50,13 @@ int main() {
     } else { std::fprintf(stderr, "cannot write stream\n"); return 2; }
 
     RecDecoder d;
-    FILE* snap = std::fopen("build/decoder_cpp.txt", "wb");
-    if (!snap) { std::fprintf(stderr, "cannot write snapshot\n"); return 2; }
+    std::string snap;
+    snap.reserve(1600000);
+    char buf[512];
 
     for (int i = 0; i < N; ++i) {
         d.process_dvc(static_cast<uint8_t>(stream[i]));
-        std::fprintf(snap,
+        std::snprintf(buf, sizeof buf,
             "%d %d %d %d %d %d %d %d %d %d %d %d %d %lld %d %d %d %d %d %d %d %d %lld %d %d %d %d\n",
             d.bits.decoder_state, d.bits.next_state, d.pixel_count, d.lastx, d.lasty,
             d.newx, d.newy, d.size_x, d.size_y, d.y_clipped, d.cache.cc_active,
@@ -55,12 +64,12 @@ int main() {
             d.video_detected ? 1 : 0, d.framerate, d.screen_x, d.screen_y, d.fatal_count,
             d.cmd_last, d.cmd_p_count, d.printchan, (long long)d.timeout_count,
             d.next_1_[31], d.pastes, d.dims, d.texts);
+        snap += buf;
     }
-    std::fclose(snap);
 
-    if (FILE* ev = std::fopen("build/decoder_events_cpp.txt", "wb")) {
-        std::fwrite(d.events.data(), 1, d.events.size(), ev); std::fclose(ev);
-    }
-    printf("fed %d bytes; pastes=%d dims=%d texts=%d\n", N, d.pastes, d.dims, d.texts);
-    return 0;
+    t::eq_oracle(snap, "decoder");
+    t::eq_oracle(d.events, "decoder_events");
+
+    std::printf("fed %d bytes; pastes=%d dims=%d texts=%d\n", N, d.pastes, d.dims, d.texts);
+    return t::report("test_dvc_decoder");
 }

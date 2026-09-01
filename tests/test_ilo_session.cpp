@@ -1,5 +1,5 @@
 // test_ilo_session.cpp — the login-cookie assembly and page scraping that
-// replaced capture_console.py's curl calls.
+// replaced the Python scraper's curl calls.
 //
 // This is exactly the sort of code that fails by quietly returning nothing: a
 // scraper that matches no parameters looks identical to a page that had none.
