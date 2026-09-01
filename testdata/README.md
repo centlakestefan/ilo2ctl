@@ -190,6 +190,41 @@ knowing before writing the RIBCL side:
   anyone asked for that. Read `GET_VM_STATUS` back after connecting, and set
   `NO_BOOT` explicitly if a boot was not intended.
 
+## The mount + one-time-boot sequence
+
+`mount_and_boot.py` used to hold this, expressed as `hpilo` calls. It is
+recorded here in raw RIBCL because that script is gone and the RIBCL side is
+not ported yet. Wrappers matter: virtual media is `RIB_INFO`, boot order is
+`SERVER_INFO`.
+
+```
+1. RIB_INFO    write  <INSERT_VIRTUAL_MEDIA DEVICE="CDROM" IMAGE_URL="http://host:8080/x.iso"/>
+2. RIB_INFO    write  <SET_VM_STATUS DEVICE="CDROM"><VM_BOOT_OPTION VALUE="BOOT_ONCE"/></SET_VM_STATUS>
+3. SERVER_INFO write  <SET_ONE_TIME_BOOT value="CDROM"/>
+4. SERVER_INFO write  <RESET_SERVER/>            (warm boot; or SET_HOST_POWER if off)
+   afterwards:  RIB_INFO write <EJECT_VIRTUAL_MEDIA DEVICE="CDROM"/>
+```
+
+What is verified against fw 2.29 and what is not, because the difference
+matters:
+
+- **Verified.** Every wrapper and mode above. Step 1 exactly as written. The
+  `SET_VM_STATUS`/`VM_BOOT_OPTION` element shape, with values `CONNECT` and
+  `NO_BOOT`. `SET_ONE_TIME_BOOT` as written, exercised with the no-op value
+  `NORMAL`. Step 4's `RESET_SERVER` is what `tools/ilo_power.cpp` already
+  sends. `EJECT_VIRTUAL_MEDIA` exactly as written.
+- **Not verified.** The literal values `BOOT_ONCE` (step 2) and `CDROM`
+  (step 3) were never sent to hardware -- setting either arms a boot, and the
+  only iLO 2 available was building releases. They come from the `hpilo` calls
+  the deleted script made (`boot_option='boot_once'`, `set_one_time_boot('cdrom')`).
+  The elements around them are verified; only these two strings are inherited
+  rather than observed.
+
+Note step 2 uses `BOOT_ONCE`, not the `CONNECT` used when capturing
+`ilo2_vm_http_requests.log`. `CONNECT` attaches the image to a *running* host,
+which is how the HTTP client was exercised without rebooting anything;
+`BOOT_ONCE` is what actually makes the next boot come off the virtual CD.
+
 ## `ilo_cert.der` (612 bytes)
 
 The X.509 certificate the iLO 2 serves on port 443, captured with a raw

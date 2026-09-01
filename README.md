@@ -54,8 +54,6 @@ repository, has never been committed to it, and nothing here needs it.
 | `tests/oracle/` | frozen recordings of HP's bytecode (the expected values) | — |
 | `tests/test_*.cpp` | the suite; every test self-asserting | `tests/oracle/` + generated vectors |
 | `tests/*Probe.java` | how those recordings were made; needs a jar you supply | — |
-| `mount_and_boot.py` | virtual-media mount + boot via `hpilo` (unported) | — |
-| `range_http_server.py` | HTTP server with Range support for virtual media | — |
 
 Local includes are root-relative (`#include "crypto/md5.hpp"`), so the source
 root is the only include directory required.
@@ -112,14 +110,20 @@ DVC video, keyboard and mouse, plus server control over RIBCL (power, reset,
 UID) and health readout (temperatures, fans, PSUs, drives, wattage). The
 console window has three tabs — Console, Power, Health — over a status block.
 
-Virtual media is part-ported: `tools/media_server.cpp` serves the image and is
-live-validated — the iLO 2 fetched a 4.7 GiB ISO from it over 38 range requests
-with no errors (`testdata/ilo2_vm_http_requests.log`, which also records the
-firmware's odd 20-digit zero-padded `Range` header). The RIBCL side is not
-written yet: `ribcl_body()` still hardcodes a `SERVER_INFO` wrapper, and virtual
-media lives under `RIB_INFO`.
+No Python is left in the operational path — the last two scripts are gone, and
+what remains is `tests/gen_*.py`, which generate reference vectors offline and
+are never needed to build or run anything. Serving an image is
+now `tools/media_server.cpp`, live-validated — the iLO 2 fetched a 4.7 GiB ISO
+from it over 38 range requests with no errors
+(`testdata/ilo2_vm_http_requests.log`, which also records the firmware's odd
+20-digit zero-padded `Range` header). `mount_and_boot.py` went with it: it had
+stopped working anyway (it needs the unavailable `hpilo` package and still
+defaulted to a stale address), and the sequence it encoded is written down in
+raw RIBCL, with its verified and unverified parts marked, under "The mount +
+one-time-boot sequence" in `testdata/README.md`.
 
 Open: the Linux build has not been compiled yet (the code is branched for it);
-`LocaleTranslator` is unported, so non-US layouts only send ASCII; the RIBCL
-virtual-media commands and the ISO picker are unwritten, and `mount_and_boot.py`
-is still what performs a mount + one-time boot.
+`LocaleTranslator` is unported, so non-US layouts only send ASCII. For virtual
+media the RIBCL commands and the ISO picker are unwritten — `ribcl_body()` still
+hardcodes a `SERVER_INFO` wrapper and virtual media needs `RIB_INFO` — so a
+mount + one-time boot currently has to be driven by hand from the recipe above.
