@@ -45,7 +45,7 @@ int main() {
 
     std::printf("[format/parse round trip and file]\n");
     {
-        std::vector<SavedConnection> l = { { "10.10.123.130", "Administrator" }, { "ilo.example", "ops" } };
+        std::vector<SavedConnection> l = { { "192.0.2.10", "Administrator" }, { "ilo.example", "ops" } };
         const auto back = parse_connections(format_connections(l));
         CHECK(back == l);
 

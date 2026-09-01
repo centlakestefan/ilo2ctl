@@ -3,7 +3,7 @@
 // The C++ replacement for ilo_power.py: same raw-RIBCL-over-TLS dialect, no
 // Python, no OpenSSL, and the same code path the GUI's power buttons use.
 //
-//   ilo_power --host 10.10.123.130 [--user U] [--pass P] <action>
+//   ilo_power --host 192.0.2.10 [--user U] [--pass P] <action>
 //
 // Actions: status (default) | on | off | force-off | reset | cold-boot |
 //          uid-on | uid-off. Password from --pass, ILO_PASS, or .ilo_pass.

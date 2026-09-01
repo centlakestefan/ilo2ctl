@@ -101,7 +101,7 @@ them: the whole run of back-to-back `<RIBCL>` documents, redundant `RESPONSE`
 stages, loose attribute spacing and CRLF endings included. Coping with that
 shape is the parser's job, so the fixtures must not be tidied.
 
-Captured 2026-09-01 from the iLO 2 at 10.10.123.130, **firmware 2.29**
+Captured 2026-09-01 from the iLO 2 at 192.0.2.10, **firmware 2.29**
 (Jul 16 2015), licence type `iLO 2 Advanced`. The `VERSION="2.22"` on every
 `<RIBCL>` element is the RIBCL *schema* version the firmware speaks, not its
 firmware version -- the two are easy to confuse.
@@ -147,6 +147,11 @@ guessable.
 
 The first few requests are `curl` self-tests, kept deliberately -- the contrast
 with the firmware's requests below them is the point.
+
+The only edit to the capture is the addresses: the iLO reads as `192.0.2.10`
+and the machine serving the image as `198.51.100.20`, both RFC 5737
+documentation ranges, substituted for the real ones throughout this repository.
+Byte offsets, header spelling, ordering and sizes are untouched.
 
 **The Range header is zero-padded to 20 digits:**
 

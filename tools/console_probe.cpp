@@ -7,7 +7,7 @@
 // looks right, a front end is a rendering exercise rather than a protocol one.
 //
 // Usage:
-//   console_probe --host 10.10.123.130 [--seconds 10] [--refresh-every N]
+//   console_probe --host 192.0.2.10 [--seconds 10] [--refresh-every N]
 //   console_probe --replay testdata/lock_screen_settled.bin
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "third_party/stb_image_write.h"

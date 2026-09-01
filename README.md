@@ -76,7 +76,7 @@ The GUI is off by default so a bare clone builds and tests with no network:
 ```
 cmake -S . -B build/gui -G Ninja -DCMAKE_BUILD_TYPE=Release -DILO2_BUILD_GUI=ON
 cmake --build build/gui --target ilo2ctl
-build/gui/ilo2ctl --host 10.10.123.130
+build/gui/ilo2ctl --host 192.0.2.10
 ```
 
 That clones pinned SDL3 (`release-3.4.14`) and Dear ImGui (`v1.92.9`) and links
@@ -107,7 +107,7 @@ on purpose — see [Provenance and scope](#provenance-and-scope) below.
 
 ## Licence
 
-Apache License 2.0 — see [`LICENSE`](LICENSE). Copyright 2026 Centlake Software.
+Apache License 2.0 — see [`LICENSE`](LICENSE). Copyright 2026 Centlake Software AB.
 
 Third-party code included in this repository, under its own terms:
 
