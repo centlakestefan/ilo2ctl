@@ -102,11 +102,51 @@ without a window.
 
 ## Not tracked (see `.gitignore`)
 
-`build/` is generated. `rc175p10.jar` is HP proprietary and deliberately absent:
-it is not required to build, test, or run anything here. It is only needed to
-regenerate the `tests/oracle/` fixtures, which is optional — obtain your own
-copy from an iLO 2 if you want to, and note that `.gitignore` refuses to commit
-it or the `_decomp/` and `_extract/` trees CFR produces from it.
+`build/` is generated. `rc175p10.jar` and anything derived from it are excluded
+on purpose — see [Provenance and scope](#provenance-and-scope) below.
+
+## Licence
+
+Apache License 2.0 — see [`LICENSE`](LICENSE). Copyright 2026 Centlake Software.
+
+Third-party code included in this repository, under its own terms:
+
+| | | |
+|---|---|---|
+| `third_party/stb_image_write.h` | Sean Barrett | public domain (Unlicense) or MIT, at your option |
+| `third_party/httplib.h` | cpp-httplib, Yuji Hirose | MIT |
+
+Fetched at build time, only when `-DILO2_BUILD_GUI=ON`, and statically linked
+into `ilo2ctl`: **SDL3** (zlib licence) and **Dear ImGui** (MIT). Neither is
+vendored here; both are pinned by tag in `CMakeLists.txt`.
+
+## Provenance and scope
+
+This is a clean reimplementation, and it matters for anyone forking it that the
+boundary is precise:
+
+- **No HP code is in this repository**, and none ever has been. `rc175p10.jar`
+  is HP proprietary. It is not included, is not required to build, test or run
+  anything here, and `.gitignore` refuses to commit it or the `_decomp/` and
+  `_extract/` trees a decompiler produces from it. Obtain your own copy from an
+  iLO 2 if you want to regenerate the fixtures below.
+- **`tests/oracle/` holds recordings, not implementation.** They are observed
+  outputs — table contents, encoder bytes, FSM state after each input byte —
+  captured by running HP's classes under the probes in `tests/*Probe.java` and
+  writing down what came out. The probes are original code that reflects into
+  HP's classes by name; they contain no HP logic. See
+  [`tests/oracle/README.md`](tests/oracle/README.md) for how each was produced.
+- **`testdata/` is captured from the author's own hardware** — an iLO 2 on
+  firmware 2.29. The DVC streams are post-decryption video of a lock screen, the
+  XML is RIBCL replies, and the HTTP log is that firmware's own requests. None
+  of it carries credentials, session tokens or image URLs;
+  [`testdata/README.md`](testdata/README.md) says so per fixture and explains
+  what each one is for.
+
+The applet was not obfuscated, so the port was done by reading decompiled
+sources and re-implementing behaviour, then checking that behaviour against the
+real bytecode. Whether that is appropriate for your jurisdiction and purpose is
+your call to make, not this file's.
 
 ## Status
 
