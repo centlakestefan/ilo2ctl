@@ -5,6 +5,12 @@ applet: remote console with keyboard and mouse, server power and UID, health
 readout, and serving an ISO for virtual media. One static binary, no OpenSSL,
 no external dependencies.
 
+![ilo2ctl showing a server's console, with Power and Health tabs alongside](docs/screenshot.png)
+
+*Decoding a real iLO 2's video. This particular frame is rendered from a
+capture fixture in `testdata/`, so it reproduces without any hardware —
+`ilo2ctl --replay testdata/lock_screen_settled.bin` shows exactly this.*
+
 It began as a from-scratch reimplementation of the remote-console applet
 (`com.hp.ilo2.remcons`, shipped as `rc175p10.jar`) — decoding its video and
 sending input — and grew past the console into the rest of what an iLO 2 can be
