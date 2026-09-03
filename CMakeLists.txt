@@ -164,5 +164,13 @@ if(ILO2_BUILD_GUI)
 
     add_executable(ilo2ctl WIN32 ui/sdl_main.cpp)
     target_link_libraries(ilo2ctl PRIVATE ilo2_core imgui SDL3::SDL3-static)
+    # The Media tab pulls in ui/media_control.hpp -> cpp-httplib, so the GUI
+    # needs the same Windows target and static runtime as media_server.
+    if(WIN32)
+        target_compile_definitions(ilo2ctl PRIVATE _WIN32_WINNT=0x0A00)
+        if(NOT MSVC)
+            target_link_options(ilo2ctl PRIVATE -static -static-libgcc -static-libstdc++)
+        endif()
+    endif()
     # WIN32 above suppresses the console window on Windows; SDL provides main().
 endif()

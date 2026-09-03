@@ -20,6 +20,7 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "third_party/stb_image_write.h"
+#include "ui/media_control.hpp"
 
 #include <SDL3/SDL.h>
 #include "imgui.h"
@@ -33,6 +34,14 @@
 using namespace ilo2;
 
 namespace {
+
+// SDL hands the chosen file to a callback on its own thread, so the pick has
+// to land somewhere stable that the frame loop can read next frame.
+struct MediaPick {
+    std::string path;
+    std::string error;
+    bool        open = false;   // a dialog is up; do not offer another
+};
 
 struct Options {
     std::string host;
@@ -52,8 +61,8 @@ struct Options {
     // anything that types a character would be a change to the server rather
     // than a nudge.
     bool        wake = false;
-    // Which panel tab to start on: console | power | health. Mostly for
-    // screenshots of the other two.
+    // Which panel tab to start on: console | power | health | media. Mostly
+    // for screenshots of the others.
     std::string tab = "console";
 };
 
@@ -244,6 +253,12 @@ int main(int argc, char** argv) {
     // Server power control over RIBCL, on its own worker; started alongside
     // the console with the same credentials.
     PowerControl power;
+    // Virtual media rides on its own worker for the same reason, and owns the
+    // HTTP server that the iLO fetches the image from.
+    MediaControl media;
+    MediaPick    media_pick;            // chosen in the picker, mounted on demand
+    bool         boot_armed_click = false;   // the Boot button is two-click, like power
+    Uint64       boot_armed_at = 0;
     // Destructive power commands take two clicks: the first arms, the second
     // confirms, and the arm expires on its own.
     bool         armed = false;
@@ -273,11 +288,21 @@ int main(int argc, char** argv) {
         pc.user = cfg.user;
         pc.pass = cfg.pass;
         power.start(pc);
+
+        MediaControl::Config mc;
+        mc.host = cfg.host;
+        mc.user = cfg.user;
+        mc.pass = cfg.pass;
+        media.start(mc);
     };
     auto do_disconnect = [&] {
         core.stop();
         power.stop();
+        // Ejects and stops serving before returning: an iLO left pointed at a
+        // URL that has stopped answering is worse than never having mounted.
+        media.stop();
         armed = false;
+        boot_armed_click = false;
     };
 
     if (opt.autoconnect) do_connect();
@@ -704,6 +729,129 @@ int main(int argc, char** argv) {
                             }
                             ImGui::EndTable();
                         }
+                    }
+                }
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Media", nullptr, tab_flags("media"))) {
+                const MediaControl::Snapshot ms = media.running()
+                    ? media.snapshot() : MediaControl::Snapshot();
+
+                if (!media.running()) {
+                    ImGui::TextDisabled("connect to a server first");
+                } else if (ms.fw.valid && !vm_scripting_licensed(ms.fw)) {
+                    // Say so once, plainly, instead of letting every mount fail
+                    // inside the firmware with something less legible.
+                    ImGui::TextColored(bad_col, "this iLO cannot script virtual media");
+                    ImGui::TextDisabled("licence: %s (needs iLO 2 Advanced)",
+                                        ms.fw.license_type.c_str());
+                } else {
+                    // ---- the image -------------------------------------------
+                    ImGui::TextDisabled("image");
+                    ImGui::SameLine(90);
+                    if (media_pick.path.empty()) ImGui::TextDisabled("(none chosen)");
+                    else                  ImGui::TextUnformatted(media_pick.path.c_str());
+
+                    ImGui::BeginDisabled(media_pick.open || ms.busy);
+                    if (ImGui::Button("Choose ISO...")) {
+                        media_pick.error.clear();
+                        media_pick.open = true;
+                        static const SDL_DialogFileFilter filters[] = {
+                            { "Disc images", "iso;img" },
+                            { "All files",   "*" },
+                        };
+                        // The callback arrives on SDL's thread, so it only
+                        // stores; the frame loop reads it next frame.
+                        SDL_ShowOpenFileDialog(
+                            [](void* ud, const char* const* list, int) {
+                                auto* self = static_cast<MediaPick*>(ud);
+                                if (!list)        { self->error = SDL_GetError(); }
+                                else if (!*list)  { /* cancelled: leave as-is */ }
+                                else              { self->path = *list; }
+                                self->open = false;
+                            },
+                            &media_pick, window, filters, 2, nullptr, false);
+                    }
+                    ImGui::EndDisabled();
+
+                    if (!media_pick.error.empty()) {
+                        ImGui::SameLine();
+                        ImGui::TextColored(bad_col, "%s", media_pick.error.c_str());
+                    }
+
+                    ImGui::Spacing();
+
+                    // ---- mount / eject ---------------------------------------
+                    const bool inserted = ms.vm.image_inserted;
+                    ImGui::BeginDisabled(ms.busy || media_pick.path.empty() || inserted);
+                    if (ImGui::Button("Mount")) media.mount(media_pick.path);
+                    ImGui::EndDisabled();
+                    ImGui::SameLine();
+                    ImGui::BeginDisabled(ms.busy || !inserted);
+                    if (ImGui::Button("Eject")) media.eject();
+                    ImGui::EndDisabled();
+                    ImGui::SameLine();
+                    ImGui::BeginDisabled(ms.busy);
+                    if (ImGui::Button("Refresh")) media.refresh();
+                    ImGui::EndDisabled();
+
+                    // ---- arming a boot ---------------------------------------
+                    // Two clicks, like the destructive power buttons: this
+                    // changes what the next reboot does.
+                    if (boot_armed_click && SDL_GetTicks() - boot_armed_at > ARM_TIMEOUT_MS)
+                        boot_armed_click = false;
+                    ImGui::Spacing();
+                    ImGui::BeginDisabled(ms.busy || !inserted);
+                    if (boot_armed_click) {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.9f, 0.3f, 0.3f, 1.0f));
+                        if (ImGui::Button("Confirm: boot from this image once")) {
+                            media.arm_boot();
+                            boot_armed_click = false;
+                        }
+                        ImGui::PopStyleColor(2);
+                    } else if (ImGui::Button("Boot from image once")) {
+                        boot_armed_click = true;
+                        boot_armed_at = SDL_GetTicks();
+                    }
+                    ImGui::EndDisabled();
+                    if (boot_armed_click) {
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("cancel")) boot_armed_click = false;
+                    }
+                    ImGui::TextDisabled("arming only sets the next boot; it does not reboot");
+                    if (ms.boot_armed)
+                        ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f),
+                                           "armed: the next reboot will use this image");
+
+                    // ---- state ------------------------------------------------
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    if (!ms.vm.valid) {
+                        ImGui::TextDisabled("reading...");
+                    } else {
+                        ImGui::Text("inserted    : %s", inserted ? "yes" : "no");
+                        ImGui::Text("boot option : %s", ms.vm.boot_option.c_str());
+                        ImGui::Text("applet      : %s", ms.vm.vm_applet.c_str());
+                        if (!ms.url.empty()) {
+                            ImGui::Text("serving at  : %s", ms.url.c_str());
+                            // The count is the honest answer to "is this
+                            // working?": inserting alone never fetches, so a
+                            // mounted image with zero requests is expected
+                            // until something actually boots.
+                            ImGui::Text("requests    : %llu  (%.1f MiB)",
+                                        (unsigned long long)ms.server.requests,
+                                        ms.server.bytes / (1024.0 * 1024.0));
+                            if (ms.server.requests == 0)
+                                ImGui::TextDisabled("the iLO does not read the image until it boots from it");
+                        }
+                    }
+                    if (ms.busy) { ImGui::Spacing(); ImGui::TextDisabled("working..."); }
+                    if (!ms.last_result.empty()) {
+                        ImGui::Spacing();
+                        ImGui::TextColored(ms.error ? bad_col : ImGui::GetStyle().Colors[ImGuiCol_Text],
+                                           "%s: %s", ms.last_action.c_str(), ms.last_result.c_str());
                     }
                 }
                 ImGui::EndTabItem();

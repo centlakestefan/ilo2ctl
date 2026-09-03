@@ -60,7 +60,7 @@ repository, has never been committed to it, and nothing here needs it.
 | `ilo/ilo2_input.hpp` | outbound mouse/keyboard encoders | real `cim` (transmit capture) |
 | `ilo/ilo2_session.hpp` | outbound session layer (RC4 encrypt, key index) | live iLO 2 |
 | `ilo/media_server.hpp` | serves an ISO over HTTP, ranges included | `test_media` + live iLO 2 |
-| `ui/media_control.hpp` | virtual-media worker behind the (future) Media tab | live iLO 2 (fw 2.29) |
+| `ui/media_control.hpp` | virtual-media worker behind the Media tab | live iLO 2 (fw 2.29) |
 | `tools/media_server.cpp` | the server as a standalone command | live iLO 2 (fw 2.29) |
 | `tools/capture_dvc.cpp` | live capture -> `.bin` + PNG | — |
 | `tools/replay_dvc.cpp` | offline replay + decoder stats | `testdata/` fixtures |
@@ -122,7 +122,7 @@ build/gui/ilo2ctl --host 192.0.2.10
 That clones pinned SDL3 (`release-3.4.14`) and Dear ImGui (`v1.92.9`) and links
 them statically, so the result is a single binary that does not depend on what
 a distro happens to ship. `--replay <file.bin>` runs it against a capture
-fixture with no hardware, `--tab power|health` picks the starting tab, and `--screenshot out.png --frames N` renders N frames
+fixture with no hardware, `--tab power|health|media` picks the starting tab, and `--screenshot out.png --frames N` renders N frames
 and exits, which works under `SDL_VIDEO_DRIVER=dummy` for checking the front end
 without a window.
 
@@ -228,15 +228,21 @@ ilo_power --host H set-one-time-boot CDROM
 ilo_power --host H reset
 ```
 
-`ui/media_control.hpp` is the worker behind all that, the sibling of
-`power_control.hpp`: it owns the HTTP server and the RIBCL calls, and works out
-the URL to advertise by asking the kernel which local address reaches the iLO
-rather than guessing from the interface list — which matters, since the iLO is
-usually on a different subnet. Mounting and arming a boot are separate calls, so
-mounting can never change what the next reboot does.
+...or from the **Media** tab, which is the whole thing end to end: pick an ISO
+with the native file dialog, mount it, and watch the request count climb as the
+firmware reads. `ui/media_control.hpp` is the worker behind it, the sibling of
+`power_control.hpp` — it owns the HTTP server as well as the RIBCL calls, and
+works out the URL to advertise by asking the kernel which local address reaches
+the iLO rather than guessing from the interface list, which matters because the
+iLO is usually on a different subnet.
 
-Open: `LocaleTranslator` is unported, so non-US layouts only send ASCII. Virtual
-media has no ISO picker or Media tab yet, so the GUI cannot mount anything —
-the command line above is the whole interface. And the two steps that arm a
-boot, `vm-boot BOOT_ONCE` and `set-one-time-boot CDROM`, have never been sent to
-hardware: see the verified/unverified split in `testdata/README.md`.
+Mounting and arming a boot are separate actions, deliberately. Mounting changes
+no boot setting, so it is safe against a running host; arming takes two clicks
+like the destructive power buttons, and still only sets the *next* boot rather
+than rebooting anything. An iLO whose licence cannot script virtual media is
+told so once, up front, instead of failing inside the firmware on every mount.
+
+Open: `LocaleTranslator` is unported, so non-US layouts only send ASCII. And the
+two steps that arm a boot, `vm-boot BOOT_ONCE` and `set-one-time-boot CDROM`,
+have never been sent to hardware — everything else here has. See the
+verified/unverified split in `testdata/README.md`.
