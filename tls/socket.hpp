@@ -53,6 +53,27 @@ public:
 
     bool valid() const { return fd_ != INVALID_SOCK; }
 
+    // The local address of this connection, as a literal.
+    //
+    // This is how the virtual-media URL learns what to call itself. The iLO
+    // fetches the image over HTTP from us, so the URL has to carry an address
+    // it can route back to -- and on a host with several interfaces, or with
+    // the iLO on a different subnet, guessing from a list of local addresses
+    // gets it wrong. Asking the kernel which interface it actually chose for
+    // *this* connection cannot be wrong by construction.
+    //
+    // Empty if the socket is not connected.
+    std::string local_address() const {
+        if (!valid()) return {};
+        sockaddr_storage ss{};
+        socklen_t len = sizeof ss;
+        if (::getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &len) != 0) return {};
+        char host[NI_MAXHOST] = {0};
+        if (::getnameinfo(reinterpret_cast<sockaddr*>(&ss), len,
+                          host, sizeof host, nullptr, 0, NI_NUMERICHOST) != 0) return {};
+        return std::string(host);
+    }
+
     bool connect(const std::string& host, uint16_t port, int timeout_ms,
                  std::string& err) {
         init();
@@ -162,6 +183,27 @@ private:
 
     socket_t fd_ = INVALID_SOCK;
 };
+
+// Which of this machine's addresses reaches `host`? Connects, asks the kernel,
+// and hangs up.
+//
+// This exists for the virtual-media URL. The iLO fetches the image from us, so
+// the URL has to name an address routable *from the iLO* — and enumerating
+// local interfaces to pick one guesses wrong on a multi-homed box, or whenever
+// the iLO sits on a different subnet and the answer depends on the route table.
+// Letting connect() resolve it removes the guess.
+//
+// Costs one short-lived TCP connection. Empty on failure, which a caller must
+// treat as "cannot build a URL" rather than falling back to a guess.
+inline std::string local_address_towards(const std::string& host, uint16_t port,
+                                         int timeout_ms = 4000) {
+    TcpSocket s;
+    std::string err;
+    if (!s.connect(host, port, timeout_ms, err)) return {};
+    const std::string addr = s.local_address();
+    s.close();
+    return addr;
+}
 
 } // namespace net
 } // namespace ilo2

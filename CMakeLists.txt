@@ -57,6 +57,7 @@ set(TESTS
     test_ilo2_input
     test_png
     test_telnet
+    test_media
 )
 
 foreach(t ${TESTS})
@@ -64,6 +65,15 @@ foreach(t ${TESTS})
     target_link_libraries(${t} PRIVATE ilo2_core)
     add_test(NAME ${t} COMMAND ${t} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
+
+# test_media serves over real sockets via cpp-httplib, so it needs the same
+# Windows target and static runtime as the media_server tool below.
+if(WIN32)
+    target_compile_definitions(test_media PRIVATE _WIN32_WINNT=0x0A00)
+    if(NOT MSVC)
+        target_link_options(test_media PRIVATE -static -static-libgcc -static-libstdc++)
+    endif()
+endif()
 
 # A few tests write intermediate streams into build/ from the source root.
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)

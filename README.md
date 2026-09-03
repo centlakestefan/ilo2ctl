@@ -59,7 +59,9 @@ repository, has never been committed to it, and nothing here needs it.
 | `ilo/cim_png.hpp` | framebuffer -> PNG (vendored `stb_image_write`) | Java `ImageIO` |
 | `ilo/ilo2_input.hpp` | outbound mouse/keyboard encoders | real `cim` (transmit capture) |
 | `ilo/ilo2_session.hpp` | outbound session layer (RC4 encrypt, key index) | live iLO 2 |
-| `tools/media_server.cpp` | serves an ISO for virtual media (vendored cpp-httplib) | live iLO 2 (fw 2.29) |
+| `ilo/media_server.hpp` | serves an ISO over HTTP, ranges included | `test_media` + live iLO 2 |
+| `ui/media_control.hpp` | virtual-media worker behind the (future) Media tab | live iLO 2 (fw 2.29) |
+| `tools/media_server.cpp` | the server as a standalone command | live iLO 2 (fw 2.29) |
 | `tools/capture_dvc.cpp` | live capture -> `.bin` + PNG | — |
 | `tools/replay_dvc.cpp` | offline replay + decoder stats | `testdata/` fixtures |
 | `tests/oracle/` | frozen recordings of HP's bytecode (the expected values) | — |
@@ -226,9 +228,15 @@ ilo_power --host H set-one-time-boot CDROM
 ilo_power --host H reset
 ```
 
+`ui/media_control.hpp` is the worker behind all that, the sibling of
+`power_control.hpp`: it owns the HTTP server and the RIBCL calls, and works out
+the URL to advertise by asking the kernel which local address reaches the iLO
+rather than guessing from the interface list — which matters, since the iLO is
+usually on a different subnet. Mounting and arming a boot are separate calls, so
+mounting can never change what the next reboot does.
+
 Open: `LocaleTranslator` is unported, so non-US layouts only send ASCII. Virtual
-media still has no worker thread and no ISO picker, so the GUI cannot mount
-anything yet — the command line above is the whole interface. And the two steps
-that arm a boot, `vm-boot BOOT_ONCE` and `set-one-time-boot CDROM`, have never
-been sent to hardware: see the verified/unverified split in
-`testdata/README.md`.
+media has no ISO picker or Media tab yet, so the GUI cannot mount anything —
+the command line above is the whole interface. And the two steps that arm a
+boot, `vm-boot BOOT_ONCE` and `set-one-time-boot CDROM`, have never been sent to
+hardware: see the verified/unverified split in `testdata/README.md`.
