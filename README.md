@@ -48,7 +48,7 @@ repository, has never been committed to it, and nothing here needs it.
 | `ui/sdl_main.cpp` | the standalone console window (SDL3 + Dear ImGui) | live iLO 2 |
 | `ui/power_control.hpp` | RIBCL worker behind the panel's power buttons | live iLO 2 |
 | `ui/connections.hpp` | recent host/user list (never the password) | `test_connections` |
-| `ilo/ribcl.hpp` | RIBCL over raw TLS: power status/on/off/reset, UID, health | live iLO 2 (fw 2.29) |
+| `ilo/ribcl.hpp` | RIBCL over raw TLS: power, UID, health, virtual media, boot order | live iLO 2 (fw 2.29) |
 | `ilo/health.hpp` | GET_EMBEDDED_HEALTH / GET_POWER_READINGS parser | `testdata/*.xml` captured from the iLO |
 | `tools/ilo_power.cpp` | RIBCL from the command line | live iLO 2 |
 | `tools/console_probe.cpp` | drives the seam like a front end would | live iLO 2 |
@@ -212,7 +212,23 @@ as well, with no warnings in this project's own code, and renders correctly
 under `SDL_VIDEO_DRIVER=dummy` against a replay fixture. What has *not* happened
 on Linux is a run against real hardware, or against a real display server.
 
-Open: `LocaleTranslator` is unported, so non-US layouts only send ASCII. For
-virtual media the RIBCL commands and the ISO picker are unwritten — `ribcl_body()` still
-hardcodes a `SERVER_INFO` wrapper and virtual media needs `RIB_INFO` — so a
-mount + one-time boot currently has to be driven by hand from the recipe above.
+The RIBCL side of virtual media is written too: `ribcl.hpp` now carries the
+wrapper per command (`SERVER_INFO` vs `RIB_INFO`), takes arguments, and parses
+`GET_VM_STATUS` and `GET_FW_VERSION`. `ilo_power` exposes the lot, so a mount
+can be driven from the command line today:
+
+```
+ilo_power --host H fw                     # incl. whether the licence allows it
+ilo_power --host H vm-status
+ilo_power --host H vm-insert http://me:8080/x.iso
+ilo_power --host H vm-boot BOOT_ONCE
+ilo_power --host H set-one-time-boot CDROM
+ilo_power --host H reset
+```
+
+Open: `LocaleTranslator` is unported, so non-US layouts only send ASCII. Virtual
+media still has no worker thread and no ISO picker, so the GUI cannot mount
+anything yet — the command line above is the whole interface. And the two steps
+that arm a boot, `vm-boot BOOT_ONCE` and `set-one-time-boot CDROM`, have never
+been sent to hardware: see the verified/unverified split in
+`testdata/README.md`.

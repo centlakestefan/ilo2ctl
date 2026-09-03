@@ -59,6 +59,17 @@ static const char* LOGIN_FAIL_REPLY =
     "<RIBCL VERSION=\"2.22\">\r\n<RESPONSE\r\n    STATUS=\"0x005F\"\r\n"
     "    MESSAGE='Login failed.'\r\n     />\r\n</RIBCL>\r\n";
 
+static std::string slurp(const char* path) {
+    std::FILE* f = std::fopen(path, "rb");
+    if (!f) return {};
+    std::string s;
+    char buf[4096];
+    size_t n;
+    while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) s.append(buf, n);
+    std::fclose(f);
+    return s;
+}
+
 int main() {
     std::printf("[command bodies]\n");
     {
@@ -73,6 +84,123 @@ int main() {
         CHECK(ribcl_body(RibclCommand::UidOn).find("UID=\"Yes\"") != std::string::npos);
         CHECK(!ribcl_is_write(RibclCommand::GetPowerStatus));
         CHECK(ribcl_is_write(RibclCommand::Reset));
+    }
+
+    std::printf("[wrappers: virtual media is RIB_INFO, not SERVER_INFO]\n");
+    {
+        // The whole point of the rework. Sending GET_VM_STATUS inside
+        // SERVER_INFO is answered with a syntax error after four "No error"
+        // stages (testdata/README.md records it verbatim), so the wrapper is
+        // asserted per command rather than assumed.
+        CHECK(std::string(ribcl_wrapper(RibclCommand::GetPowerStatus))     == "SERVER_INFO");
+        CHECK(std::string(ribcl_wrapper(RibclCommand::GetOneTimeBoot))     == "SERVER_INFO");
+        CHECK(std::string(ribcl_wrapper(RibclCommand::SetOneTimeBoot))     == "SERVER_INFO");
+        CHECK(std::string(ribcl_wrapper(RibclCommand::GetVmStatus))        == "RIB_INFO");
+        CHECK(std::string(ribcl_wrapper(RibclCommand::GetFwVersion))       == "RIB_INFO");
+        CHECK(std::string(ribcl_wrapper(RibclCommand::InsertVirtualMedia)) == "RIB_INFO");
+        CHECK(std::string(ribcl_wrapper(RibclCommand::EjectVirtualMedia))  == "RIB_INFO");
+        CHECK(std::string(ribcl_wrapper(RibclCommand::SetVmBootOption))    == "RIB_INFO");
+
+        // ... and the body must actually carry it, opened and closed.
+        const std::string vm = ribcl_body(RibclCommand::GetVmStatus);
+        CHECK(vm.find("<RIB_INFO MODE=\"read\">") != std::string::npos);
+        CHECK(vm.find("</RIB_INFO>") != std::string::npos);
+        CHECK(vm.find("SERVER_INFO") == std::string::npos);
+
+        const std::string pw = ribcl_body(RibclCommand::GetPowerStatus);
+        CHECK(pw.find("<SERVER_INFO MODE=\"read\">") != std::string::npos);
+        CHECK(pw.find("RIB_INFO") == std::string::npos);
+
+        // Reads must not take a write lock; writes must not go out as reads.
+        CHECK(!ribcl_is_write(RibclCommand::GetVmStatus));
+        CHECK(!ribcl_is_write(RibclCommand::GetFwVersion));
+        CHECK(!ribcl_is_write(RibclCommand::GetOneTimeBoot));
+        CHECK(ribcl_is_write(RibclCommand::InsertVirtualMedia));
+        CHECK(ribcl_is_write(RibclCommand::EjectVirtualMedia));
+        CHECK(ribcl_is_write(RibclCommand::SetVmBootOption));
+        CHECK(ribcl_is_write(RibclCommand::SetOneTimeBoot));
+    }
+
+    std::printf("[virtual-media command bodies]\n");
+    {
+        RibclArgs a;
+        a.image_url = "http://198.51.100.20:8080/win2022.iso";
+        const std::string ins = ribcl_body(RibclCommand::InsertVirtualMedia, a);
+        CHECK(ins.find("<INSERT_VIRTUAL_MEDIA DEVICE=\"CDROM\"") != std::string::npos);
+        CHECK(ins.find("IMAGE_URL=\"http://198.51.100.20:8080/win2022.iso\"") != std::string::npos);
+        CHECK(ins.find("MODE=\"write\"") != std::string::npos);
+
+        // A URL with a query string must survive as an attribute value.
+        RibclArgs q;
+        q.image_url = "http://h/i.iso?a=1&b=2";
+        const std::string qs = ribcl_body(RibclCommand::InsertVirtualMedia, q);
+        CHECK(qs.find("a=1&amp;b=2") != std::string::npos);
+        CHECK(qs.find("a=1&b=2") == std::string::npos);
+
+        // Device defaults to CDROM but is honoured when given.
+        RibclArgs f; f.device = "FLOPPY";
+        CHECK(ribcl_body(RibclCommand::GetVmStatus, f).find("DEVICE=\"FLOPPY\"") != std::string::npos);
+        CHECK(ribcl_body(RibclCommand::GetVmStatus).find("DEVICE=\"CDROM\"") != std::string::npos);
+
+        // SET_VM_STATUS nests a child element rather than taking an attribute.
+        RibclArgs b; b.boot_option = "BOOT_ONCE";
+        const std::string sb = ribcl_body(RibclCommand::SetVmBootOption, b);
+        CHECK(sb.find("<SET_VM_STATUS DEVICE=\"CDROM\">") != std::string::npos);
+        CHECK(sb.find("<VM_BOOT_OPTION VALUE=\"BOOT_ONCE\"/>") != std::string::npos);
+        CHECK(sb.find("</SET_VM_STATUS>") != std::string::npos);
+        // Defaulting must be the harmless option, never a boot.
+        CHECK(ribcl_body(RibclCommand::SetVmBootOption).find("VALUE=\"NO_BOOT\"") != std::string::npos);
+
+        // Lower-case `value` is what the firmware accepts; see ribcl.hpp.
+        RibclArgs o; o.boot_device = "CDROM";
+        CHECK(ribcl_body(RibclCommand::SetOneTimeBoot, o).find("<SET_ONE_TIME_BOOT value=\"CDROM\"/>") != std::string::npos);
+        CHECK(ribcl_body(RibclCommand::SetOneTimeBoot).find("value=\"NORMAL\"") != std::string::npos);
+
+        CHECK(ribcl_body(RibclCommand::EjectVirtualMedia).find("<EJECT_VIRTUAL_MEDIA DEVICE=\"CDROM\"/>") != std::string::npos);
+    }
+
+    std::printf("[parsing real captured replies]\n");
+    {
+        // The fixtures are whole replies as fw 2.29 sent them, envelope and all.
+        const std::string cd = slurp("testdata/vm_status_cdrom.xml");
+        CHECK(!cd.empty());
+        const VmStatus v = parse_vm_status(cd);
+        CHECK(v.valid);
+        CHECK(v.device == "CDROM");
+        CHECK(v.vm_applet == "DISCONNECTED");
+        CHECK(v.boot_option == "NO_BOOT");
+        CHECK(v.write_protect);
+        CHECK(!v.image_inserted);
+        CHECK(v.image_url.empty());
+
+        // WRITE_PROTECT genuinely differs by device out of the box, so this
+        // is not a copy of the case above.
+        const std::string fl = slurp("testdata/vm_status_floppy.xml");
+        CHECK(!fl.empty());
+        const VmStatus w = parse_vm_status(fl);
+        CHECK(w.valid);
+        CHECK(w.device == "FLOPPY");
+        CHECK(!w.write_protect);
+
+        const std::string fw = slurp("testdata/fw_version.xml");
+        CHECK(!fw.empty());
+        const FwInfo i = parse_fw_version(fw);
+        CHECK(i.valid);
+        CHECK(i.firmware_version == "2.29");
+        CHECK(i.management_processor == "iLO2");
+        CHECK(i.license_type == "iLO 2 Advanced");
+        CHECK(vm_scripting_licensed(i));
+
+        // A base-licence iLO must not be offered scripted virtual media.
+        FwInfo base; base.valid = true; base.firmware_version = "2.29";
+        base.license_type = "iLO 2 Standard";
+        CHECK(!vm_scripting_licensed(base));
+        CHECK(!vm_scripting_licensed(FwInfo{}));
+
+        // Junk in, no crash and nothing claimed.
+        CHECK(!parse_vm_status("").valid);
+        CHECK(!parse_vm_status("<GET_VM_STATUS").valid);      // no terminator
+        CHECK(!parse_fw_version("nonsense").valid);
     }
 
     std::printf("[document]\n");
