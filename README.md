@@ -236,6 +236,13 @@ works out the URL to advertise by asking the kernel which local address reaches
 the iLO rather than guessing from the interface list, which matters because the
 iLO is usually on a different subnet.
 
+![The Media tab of ilo2ctl, serving a mounted ISO to a live iLO 2](docs/screenshot-media.png)
+
+*A real iLO 2 (fw 2.29) with an image mounted. `boot option: NO_BOOT` is the
+point: mounting changed no boot setting. The zero request count is expected —
+the firmware records the URL and reads nothing until it boots from it — which is
+why the read map below it is still dark.*
+
 Mounting and arming a boot are separate actions, deliberately. Mounting changes
 no boot setting, so it is safe against a running host; arming takes two clicks
 like the destructive power buttons, and still only sets the *next* boot rather
