@@ -252,6 +252,11 @@ server has to stay up for the whole install, so the window has to stay open, and
 a strip that flickers as the firmware reads is the difference between waiting
 and guessing.
 
+For the same reason, closing the window with an image mounted asks first, and
+says when the iLO last read from it — the read map already knows, and an image
+being read three seconds ago is a different proposition from one nothing has
+touched. With nothing mounted the close goes straight through.
+
 Open: `LocaleTranslator` is unported, so non-US layouts only send ASCII. And the
 two steps that arm a boot, `vm-boot BOOT_ONCE` and `set-one-time-boot CDROM`,
 have never been sent to hardware — everything else here has. See the

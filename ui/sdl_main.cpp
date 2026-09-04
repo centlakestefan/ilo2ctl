@@ -113,6 +113,17 @@ void draw_read_map(const MediaServer::Stats& s) {
     }
 }
 
+// How long since the firmware last read any part of the image, in
+// milliseconds, or -1 if it never has. The read map already carries this: the
+// most recent timestamp in it is the last time anything was asked for.
+int64_t ms_since_last_read(const MediaServer::Stats& s) {
+    uint32_t newest = 0;
+    for (uint32_t t : s.map)
+        if (t && (newest == 0 || static_cast<int32_t>(t - newest) > 0)) newest = t;
+    if (!newest) return -1;
+    return static_cast<int64_t>(static_cast<uint32_t>(s.now - newest));
+}
+
 struct Options {
     std::string host;
     std::string user = "Administrator";
@@ -378,15 +389,24 @@ int main(int argc, char** argv) {
     if (opt.autoconnect) do_connect();
 
     bool quit = false;
+    // A close the media guard is holding until the question is answered, and
+    // whether its dialog is currently up. Closing stops the HTTP server, and
+    // the firmware reads the image for as long as it is mounted -- during an
+    // install, tens of minutes -- so this is the one close in the program that
+    // can break something at the other end.
+    bool close_requested = false;
+    bool close_guard_up  = false;
     while (!quit) {
         SDL_Event ev;
         while (SDL_PollEvent(&ev)) {
             ImGui_ImplSDL3_ProcessEvent(&ev);
             const ImGuiIO& io = ImGui::GetIO();
 
-            if (ev.type == SDL_EVENT_QUIT) quit = true;
+            // Never quits here: the guard below decides, so that a close with
+            // an image mounted asks first.
+            if (ev.type == SDL_EVENT_QUIT) close_requested = true;
             if (ev.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
-                ev.window.windowID == SDL_GetWindowID(window)) quit = true;
+                ev.window.windowID == SDL_GetWindowID(window)) close_requested = true;
 
             if (!send_input || core.state() != ConsoleState::Connected) continue;
 
@@ -418,12 +438,12 @@ int main(int argc, char** argv) {
                     break;
                 }
                 case SDL_EVENT_TEXT_INPUT: {
-                    if (io.WantTextInput || !console_tab_active) break;
+                    if (io.WantTextInput || close_guard_up || !console_tab_active) break;
                     for (const char* p = ev.text.text; *p; ++p) core.type_char(*p);
                     break;
                 }
                 case SDL_EVENT_KEY_DOWN: {
-                    if (io.WantTextInput || !console_tab_active) break;
+                    if (io.WantTextInput || close_guard_up || !console_tab_active) break;
                     std::string bytes;
                     if (special_key_bytes(ev.key.key, bytes)) core.send_raw(bytes);
                     break;
@@ -933,6 +953,68 @@ int main(int argc, char** argv) {
         }
         ImGui::End();
 
+        // --- the media guard --------------------------------------------------
+        //
+        // Closing the window stops the HTTP server, and the firmware reads the
+        // image for as long as it is mounted. An install reads it for tens of
+        // minutes, so closing halfway through fails the install on the far end
+        // with nothing on this side to explain why. With nothing mounted there
+        // is nothing to lose, and the close goes through untouched.
+        static const char* kGuardTitle = "Still serving an image###quitguard";
+        if (close_requested && !close_guard_up) {
+            const MediaControl::Snapshot ms = media.running() ? media.snapshot()
+                                                              : MediaControl::Snapshot();
+            if (ms.url.empty()) {
+                quit = true;
+                close_requested = false;
+            } else {
+                ImGui::OpenPopup(kGuardTitle);
+                close_guard_up = true;
+            }
+        }
+        if (ImGui::BeginPopupModal(kGuardTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            const MediaControl::Snapshot ms = media.running() ? media.snapshot()
+                                                              : MediaControl::Snapshot();
+            ImGui::TextUnformatted("Closing ejects the image and stops serving it.");
+            if (!ms.iso.empty()) ImGui::TextDisabled("%s", ms.iso.c_str());
+
+            // The read map already knows whether anything is actually reading,
+            // which is the whole question here: an image nobody has touched is
+            // safe to drop, and one being read right now is not.
+            ImGui::Spacing();
+            const int64_t idle = ms_since_last_read(ms.server);
+            if (idle < 0) {
+                ImGui::TextDisabled("the iLO has not read from it yet");
+            } else if (idle < 60000) {
+                ImGui::TextColored(bad_col,
+                                   "the iLO read from it %.0fs ago -- an install may be running",
+                                   idle / 1000.0);
+            } else {
+                ImGui::TextDisabled("last read %.0f min ago", idle / 60000.0);
+            }
+
+            ImGui::Spacing();
+            if (ImGui::Button("Keep it running")) {     // the safe answer, first
+                close_requested = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.9f, 0.3f, 0.3f, 1.0f));
+            if (ImGui::Button("Eject and close")) {
+                quit = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleColor(2);
+            ImGui::EndPopup();
+        }
+        // Dismissed with Escape rather than answered. Read that as cancelling
+        // the close: of the two ways to be wrong, staying open is the cheap one.
+        if (close_guard_up && !ImGui::IsPopupOpen(kGuardTitle)) {
+            close_guard_up  = false;
+            close_requested = false;
+        }
+
         ImGui::Render();
 
         // SDL3 delivers SDL_EVENT_TEXT_INPUT only while text input is enabled,
@@ -963,6 +1045,10 @@ int main(int argc, char** argv) {
     }
 
     core.stop();
+    // Explicitly, rather than leaving it to the destructor after SDL is gone:
+    // this ejects and stops serving, which is what "Eject and close" promised,
+    // and it takes a TLS round trip to do.
+    media.stop();
     if (tex) SDL_DestroyTexture(tex);
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
