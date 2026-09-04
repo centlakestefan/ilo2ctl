@@ -43,6 +43,76 @@ struct MediaPick {
     bool        open = false;   // a dialog is up; do not offer another
 };
 
+// Where in the image the firmware has been reading, drawn as a strip.
+//
+// Deliberately not a progress bar. The iLO seeks around the ISO in 2 KiB and
+// 4 KiB reads, never touches most of it, and re-reads what it has already had,
+// so a single percentage would be a fiction in both directions. The strip is
+// the image end to end: dark where nothing has been asked for, bright where it
+// is being read right now, fading over a couple of seconds to a mid tone for
+// what was read earlier. That answers the two questions someone watching an
+// install actually has -- is it still alive, and how far has it got -- and it
+// answers the first one even when the second has barely moved.
+void draw_read_map(const MediaServer::Stats& s) {
+    if (s.map.empty() || s.size <= 0) return;
+
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    const float  w = ImGui::GetContentRegionAvail().x;
+    const float  h = ImGui::GetTextLineHeight() * 1.25f;
+    if (w < 16.0f || h < 2.0f) return;
+
+    // Reserve the space first, so the strip is a real widget that can be
+    // hovered rather than something painted over the layout.
+    ImGui::InvisibleButton("##readmap", ImVec2(w, h));
+    const bool hovered = ImGui::IsItemHovered();
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), IM_COL32(26, 28, 36, 255));
+
+    const float fade_ms = 2500.0f;      // bright -> mid, slow enough to notice
+    const int   n       = static_cast<int>(s.map.size());
+    const int   cols    = static_cast<int>(w);
+
+    for (int x = 0; x < cols; ++x) {
+        const int b0 = x * n / cols;
+        int       b1 = (x + 1) * n / cols;
+        if (b1 <= b0) b1 = b0 + 1;
+        if (b1 > n)   b1 = n;
+        // Several buckets can land on one column. Take the most recently read
+        // rather than an average, so a single live read is never smeared into
+        // invisibility by the cold buckets either side of it.
+        uint32_t newest = 0;
+        for (int b = b0; b < b1; ++b) {
+            const uint32_t t = s.map[static_cast<size_t>(b)];
+            if (t && (newest == 0 || static_cast<int32_t>(t - newest) > 0)) newest = t;
+        }
+        if (!newest) continue;
+        const float age = static_cast<float>(static_cast<uint32_t>(s.now - newest));
+        const float k   = age >= fade_ms ? 1.0f : age / fade_ms;
+        const ImVec4 c(0.60f + (0.24f - 0.60f) * k,
+                       0.84f + (0.38f - 0.84f) * k,
+                       1.00f + (0.58f - 1.00f) * k,
+                       1.0f);
+        dl->AddRectFilled(ImVec2(p.x + x, p.y), ImVec2(p.x + x + 1.0f, p.y + h),
+                          ImGui::ColorConvertFloat4ToU32(c));
+    }
+    dl->AddRect(p, ImVec2(p.x + w, p.y + h), IM_COL32(70, 74, 86, 255));
+
+    // "Touched", not "read": a bucket is megabytes wide and lights up for a
+    // single 4 KiB read inside it, so this is an upper bound on coverage.
+    int covered = 0;
+    for (int b = 0; b < n; ++b) if (s.map[static_cast<size_t>(b)]) ++covered;
+    const double mib = s.size / (1024.0 * 1024.0);
+    ImGui::TextDisabled("%.0f%% of the image touched  (%.0f MiB)",
+                        covered * 100.0 / n, mib);
+
+    if (hovered) {
+        float f = (ImGui::GetIO().MousePos.x - p.x) / w;
+        f = f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f);
+        ImGui::SetTooltip("%.0f MiB into the image", mib * f);
+    }
+}
+
 struct Options {
     std::string host;
     std::string user = "Administrator";
@@ -843,6 +913,8 @@ int main(int argc, char** argv) {
                             ImGui::Text("requests    : %llu  (%.1f MiB)",
                                         (unsigned long long)ms.server.requests,
                                         ms.server.bytes / (1024.0 * 1024.0));
+                            ImGui::Spacing();
+                            draw_read_map(ms.server);
                             if (ms.server.requests == 0)
                                 ImGui::TextDisabled("the iLO does not read the image until it boots from it");
                         }

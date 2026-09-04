@@ -32,6 +32,34 @@ static std::string make_image(const char* path, size_t n) {
     return data;
 }
 
+// A tiny HTTP client over the raw socket: the point is to send exactly the
+// bytes the firmware sends, including its odd padding. Returns the status code
+// and fills `body`, or -1 if the exchange never got that far.
+static int fetch(uint16_t port, const std::string& range_header, std::string& body) {
+    net::TcpSocket c;
+    std::string e;
+    if (!c.connect("127.0.0.1", port, 4000, e)) return -1;
+    std::string req = "GET /test_media_image.iso HTTP/1.1\r\n"
+                      "Host: 127.0.0.1\r\n";
+    if (!range_header.empty()) req += "Range: " + range_header + "\r\n";
+    req += "Connection: close\r\n\r\n";
+    if (!c.send_all(reinterpret_cast<const uint8_t*>(req.data()), req.size())) return -1;
+    c.set_recv_timeout(4000);
+    std::string all;
+    for (;;) {
+        uint8_t buf[8192];
+        const int n = c.recv(buf, sizeof buf);
+        if (n <= 0) break;
+        all.append(reinterpret_cast<char*>(buf), static_cast<size_t>(n));
+    }
+    c.close();
+    const size_t hdr = all.find("\r\n\r\n");
+    if (hdr == std::string::npos) return -1;
+    body = all.substr(hdr + 4);
+    const size_t sp = all.find(' ');
+    return (sp == std::string::npos) ? -1 : std::atoi(all.c_str() + sp + 1);
+}
+
 int main() {
     const char* iso = "build/test_media_image.iso";
     const size_t N = 300000;
@@ -81,49 +109,75 @@ int main() {
 
     std::printf("[range requests]\n");
     {
-        // A tiny HTTP client over the raw socket: the point is to send exactly
-        // the bytes the firmware sends, including its odd padding.
-        auto fetch = [&](const std::string& range_header, std::string& body) -> int {
-            net::TcpSocket c;
-            std::string e;
-            if (!c.connect("127.0.0.1", PORT, 4000, e)) return -1;
-            std::string req = "GET /test_media_image.iso HTTP/1.1\r\n"
-                              "Host: 127.0.0.1\r\n";
-            if (!range_header.empty()) req += "Range: " + range_header + "\r\n";
-            req += "Connection: close\r\n\r\n";
-            if (!c.send_all(reinterpret_cast<const uint8_t*>(req.data()), req.size())) return -1;
-            c.set_recv_timeout(4000);
-            std::string all;
-            for (;;) {
-                uint8_t buf[8192];
-                const int n = c.recv(buf, sizeof buf);
-                if (n <= 0) break;
-                all.append(reinterpret_cast<char*>(buf), static_cast<size_t>(n));
-            }
-            c.close();
-            const size_t hdr = all.find("\r\n\r\n");
-            if (hdr == std::string::npos) return -1;
-            body = all.substr(hdr + 4);
-            const size_t sp = all.find(' ');
-            return (sp == std::string::npos) ? -1 : std::atoi(all.c_str() + sp + 1);
-        };
-
         std::string body;
-        t::ok(fetch("", body) == 200, "plain GET is 200");
+        t::ok(fetch(PORT, "", body) == 200, "plain GET is 200");
         t::ok(body.size() == N, "plain GET returns the whole image");
         t::ok(body == truth, "plain GET bytes are exact");
 
-        t::ok(fetch("bytes=100-131", body) == 206, "byte range is 206");
+        t::ok(fetch(PORT, "bytes=100-131", body) == 206, "byte range is 206");
         t::ok(body == truth.substr(100, 32), "range bytes are exact");
 
         // The firmware's own spelling. Same 32 bytes, twenty-digit offsets.
-        t::ok(fetch("bytes=00000000000000000100-00000000000000000131", body) == 206,
+        t::ok(fetch(PORT, "bytes=00000000000000000100-00000000000000000131", body) == 206,
               "zero-padded range is 206");
         t::ok(body == truth.substr(100, 32), "zero-padded range bytes are exact");
 
         // Open-ended, as a reader walking to the end would send.
-        t::ok(fetch("bytes=299990-", body) == 206, "open-ended range is 206");
+        t::ok(fetch(PORT, "bytes=299990-", body) == 206, "open-ended range is 206");
         t::ok(body == truth.substr(299990), "open-ended range bytes are exact");
+    }
+
+    std::printf("[read map]\n");
+    {
+        // What a front end draws to show the firmware working through the
+        // image. A second server on its own port so the counters asserted
+        // below are not disturbed, and so the map starts empty.
+        //
+        // This also pins down something the strip depends on and nothing else
+        // asserts directly: for a range request cpp-httplib hands the content
+        // provider an *absolute* file offset, not one relative to the range.
+        // If that ever changed, the bytes would still be right (we seek to the
+        // offset we are given) but every read would be plotted at the wrong
+        // place on the strip.
+        MediaServer m;
+        std::string e;
+        const uint16_t MPORT = 18100;
+        if (t::ok(m.start(iso, MPORT, e), "read-map server starts")) {
+            MediaServer::Stats s = m.stats();
+            t::ok(s.map.size() == static_cast<size_t>(MediaServer::kMapBuckets),
+                  "map has one entry per bucket");
+            t::ok(s.now != 0, "map carries a clock to age timestamps against");
+            int marked = 0;
+            for (uint32_t v : s.map) if (v) ++marked;
+            t::ok(marked == 0, "nothing read yet, so nothing marked");
+
+            // Ten bytes at the very end, and nothing else.
+            std::string body;
+            t::ok(fetch(MPORT, "bytes=299990-", body) == 206, "tail range served");
+            s = m.stats();
+            marked = 0;
+            for (uint32_t v : s.map) if (v) ++marked;
+            t::ok(marked == 1, "a ten-byte read marks exactly one bucket");
+            t::ok(s.map[static_cast<size_t>(MediaServer::kMapBuckets - 1)] != 0,
+                  "and it is the bucket at the end of the image");
+            t::ok(s.map[0] == 0, "the head of the image is still untouched");
+
+            // A whole-image GET covers everything, however it is chunked.
+            t::ok(fetch(MPORT, "", body) == 200, "whole image served");
+            s = m.stats();
+            marked = 0;
+            for (uint32_t v : s.map) if (v) ++marked;
+            t::ok(marked == MediaServer::kMapBuckets, "a full read marks every bucket");
+
+            // Restarting resets the map: a second image must not inherit the
+            // first one's read history.
+            t::ok(m.start(iso, MPORT, e), "server restarts");
+            s = m.stats();
+            marked = 0;
+            for (uint32_t v : s.map) if (v) ++marked;
+            t::ok(marked == 0, "restart clears the map");
+            m.stop();
+        }
     }
 
     std::printf("[shutdown]\n");

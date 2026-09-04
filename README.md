@@ -242,6 +242,16 @@ like the destructive power buttons, and still only sets the *next* boot rather
 than rebooting anything. An iLO whose licence cannot script virtual media is
 told so once, up front, instead of failing inside the firmware on every mount.
 
+Under the request count is a **read map**: the image drawn end to end, dark
+where the firmware has asked for nothing, bright where it is reading right now,
+fading to a mid tone for what it read earlier. It is not a progress bar, because
+there is nothing linear to report — the iLO seeks around the ISO in 2 KiB and
+4 KiB reads and never touches most of it — but it answers the question that
+matters during an install, which is whether anything is still happening. The
+server has to stay up for the whole install, so the window has to stay open, and
+a strip that flickers as the firmware reads is the difference between waiting
+and guessing.
+
 Open: `LocaleTranslator` is unported, so non-US layouts only send ASCII. And the
 two steps that arm a boot, `vm-boot BOOT_ONCE` and `set-one-time-boot CDROM`,
 have never been sent to hardware — everything else here has. See the

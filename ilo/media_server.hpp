@@ -17,13 +17,16 @@
 
 #include "third_party/httplib.h"   // must precede anything pulling in windows.h
 
+#include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace ilo2 {
 
@@ -37,7 +40,25 @@ public:
         std::string iso;            // path being served
         std::string url_path;       // e.g. "/image.iso"
         uint16_t port = 0;
+
+        // Which parts of the image have been read, and when. One entry per
+        // bucket of the image, holding the time that bucket was last read on
+        // the same clock as `now`, or 0 for never read. A front end turns
+        // (now - map[i]) into how recently that part was touched.
+        //
+        // It exists because the firmware seeks around the image in 2 KiB and
+        // 4 KiB reads rather than streaming it front to back, so a single
+        // percentage cannot say either what is happening now or how much has
+        // been covered. Both matter to someone deciding whether the install is
+        // alive and whether they can close the window.
+        std::vector<uint32_t> map;
+        uint32_t now = 0;           // the clock `map` is expressed on
     };
+
+    // Resolution of the read map. Finer than any bar we are likely to draw, so
+    // a front end downsamples; on a 4 GiB image a bucket is 8 MiB, which the
+    // firmware's 4 KiB reads fill one at a time.
+    static constexpr int kMapBuckets = 512;
 
     MediaServer() = default;
     ~MediaServer() { stop(); }
@@ -58,6 +79,7 @@ public:
         url_path_ = "/" + basename_of(iso);
         requests_ = 0;
         bytes_    = 0;
+        for (auto& b : map_) b.store(0, std::memory_order_relaxed);
 
         svr_ = std::make_unique<httplib::Server>();
 
@@ -87,6 +109,7 @@ public:
                     std::fclose(f);
                     if (n == 0) return false;
                     bytes_ += n;
+                    mark_read(static_cast<int64_t>(offset), n);
                     sink.write(buf, n);
                     return true;
                 });
@@ -128,7 +151,22 @@ public:
         s.iso      = iso_;
         s.url_path = url_path_;
         s.port     = port_;
+        s.now      = now_ms();
+        s.map.resize(kMapBuckets);
+        for (int i = 0; i < kMapBuckets; ++i)
+            s.map[static_cast<size_t>(i)] = map_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         return s;
+    }
+
+    // Milliseconds on an arbitrary monotonic clock, never 0 -- 0 is the "never
+    // read" marker in the map. Wrapping after ~49 days is harmless: the map is
+    // only ever read as a difference from `now`, and unsigned arithmetic gets
+    // that right across the wrap.
+    static uint32_t now_ms() {
+        using namespace std::chrono;
+        const auto t = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+        const uint32_t v = static_cast<uint32_t>(t);
+        return v ? v : 1;
     }
 
     static int64_t file_size(const std::string& path) {
@@ -160,6 +198,22 @@ public:
     }
 
 private:
+    // Stamp every bucket the read [offset, offset+n) touched. Called from the
+    // server thread on every read, so it takes no lock: the map is a grid of
+    // relaxed atomics, and a front end reading a torn-by-one-millisecond
+    // timestamp draws an identical pixel.
+    void mark_read(int64_t offset, size_t n) {
+        if (size_ <= 0 || n == 0 || offset < 0) return;
+        const int64_t last_byte = offset + static_cast<int64_t>(n) - 1;
+        int64_t first = offset * kMapBuckets / size_;
+        int64_t last  = last_byte * kMapBuckets / size_;
+        if (first < 0) first = 0;
+        if (last > kMapBuckets - 1) last = kMapBuckets - 1;
+        const uint32_t t = now_ms();
+        for (int64_t i = first; i <= last; ++i)
+            map_[static_cast<size_t>(i)].store(t, std::memory_order_relaxed);
+    }
+
     std::unique_ptr<httplib::Server> svr_;
     std::thread            thread_;
     std::string            iso_;
@@ -168,6 +222,7 @@ private:
     uint16_t               port_ = 0;
     std::atomic<uint64_t>  requests_{0};
     std::atomic<uint64_t>  bytes_{0};
+    std::array<std::atomic<uint32_t>, kMapBuckets> map_{};
 };
 
 } // namespace ilo2
